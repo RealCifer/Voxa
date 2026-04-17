@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
+import dotenv from "dotenv";
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+dotenv.config({ quiet: true });
+
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
