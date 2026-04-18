@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
 import { useAppStore } from "@/lib/store/app-store";
+import { getGroqApiKey } from "@/lib/groqClient";
 
 const CHUNK_TIMESLICE_MS = 30_000; // <= 30s per requirement
 
@@ -13,14 +14,17 @@ export function TranscriptPanel() {
   const pushAudioChunk = useAppStore((s) => s.pushAudioChunk);
   const clearAudioChunks = useAppStore((s) => s.clearAudioChunks);
   const audioChunks = useAppStore((s) => s.audioChunks);
+  const appendTranscript = useAppStore((s) => s.appendTranscript);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const chunkIndexRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
 
   async function startRecording() {
     setError(null);
     clearAudioChunks();
+    chunkIndexRef.current = 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -29,7 +33,7 @@ export function TranscriptPanel() {
       const recorder = new MediaRecorder(stream);
       recorderRef.current = recorder;
 
-      recorder.addEventListener("dataavailable", (e) => {
+      recorder.addEventListener("dataavailable", async (e) => {
         if (!e.data || e.data.size === 0) return;
 
         const chunk = {
@@ -42,10 +46,44 @@ export function TranscriptPanel() {
 
         pushAudioChunk(chunk);
 
-        // Prepare to send to backend later (placeholder):
-        // - can POST chunk.blob directly
-        // - or wrap in FormData: formData.append("file", new File([blob], "chunk.webm", { type: mimeType }))
         console.log("[audio chunk]", chunk);
+
+        // Send chunk to backend for transcription (no streaming yet).
+        try {
+          const filename = `chunk-${chunkIndexRef.current}.webm`;
+          const file = new File([chunk.blob], filename, { type: chunk.mimeType });
+          const body = new FormData();
+          body.set("file", file);
+
+          const apiKey = getGroqApiKey();
+          const res = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: apiKey ? { "x-groq-api-key": apiKey } : undefined,
+            body,
+          });
+          const json = (await res.json()) as { text?: string; error?: string };
+          if (!res.ok) throw new Error(json.error ?? "Transcription request failed");
+
+          const text = (json.text ?? "").trim();
+          if (text) {
+            appendTranscript({
+              id: crypto.randomUUID(),
+              text,
+              startMs: chunkIndexRef.current * CHUNK_TIMESLICE_MS,
+              isFinal: true,
+            });
+          }
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            err.message.includes("Missing Groq API key")
+          ) {
+            setError("Missing Groq API key. Add it in Settings, then try again.");
+          }
+          console.error("[transcribe error]", err);
+        } finally {
+          chunkIndexRef.current += 1;
+        }
       });
 
       recorder.addEventListener("stop", () => {
