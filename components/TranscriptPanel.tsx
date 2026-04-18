@@ -25,6 +25,11 @@ export function TranscriptPanel() {
     setError(null);
     clearAudioChunks();
     chunkIndexRef.current = 0;
+    const keyAtStart = getGroqApiKey()?.trim() ?? "";
+    if (!keyAtStart) {
+      setError("Missing Groq API key. Open Settings, add key, and click Save.");
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -55,14 +60,27 @@ export function TranscriptPanel() {
           const body = new FormData();
           body.set("file", file);
 
-          const apiKey = getGroqApiKey();
+          const apiKey = getGroqApiKey()?.trim() ?? "";
+          if (!apiKey) {
+            setError("Missing Groq API key. Open Settings, add key, and click Save.");
+            return;
+          }
+          body.set("groqApiKey", apiKey);
           const res = await fetch("/api/transcribe", {
             method: "POST",
             headers: apiKey ? { "x-groq-api-key": apiKey } : undefined,
             body,
           });
           const json = (await res.json()) as { text?: string; error?: string };
-          if (!res.ok) throw new Error(json.error ?? "Transcription request failed");
+          if (!res.ok) {
+            const msg = json.error ?? "Transcription request failed";
+            if (msg.includes("Missing Groq API key")) {
+              setError("Missing Groq API key. Open Settings, add key, and click Save.");
+            } else {
+              setError(msg);
+            }
+            return;
+          }
 
           const text = (json.text ?? "").trim();
           if (text) {
@@ -74,13 +92,7 @@ export function TranscriptPanel() {
             });
           }
         } catch (err) {
-          if (
-            err instanceof Error &&
-            err.message.includes("Missing Groq API key")
-          ) {
-            setError("Missing Groq API key. Add it in Settings, then try again.");
-          }
-          console.error("[transcribe error]", err);
+          setError(err instanceof Error ? err.message : "Transcription failed.");
         } finally {
           chunkIndexRef.current += 1;
         }

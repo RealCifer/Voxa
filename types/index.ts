@@ -8,7 +8,8 @@ export type TranscriptSegment = {
 
 export type Suggestion = {
   id: string;
-  text: string;
+  kind: "question" | "answer" | "clarification" | "fact-check";
+  preview: string;
   source?: "llm" | "rule" | "user";
 };
 

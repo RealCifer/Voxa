@@ -3,17 +3,6 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const apiKey =
-    process.env.GROQ_API_KEY?.trim() ||
-    req.headers.get("x-groq-api-key")?.trim() ||
-    null;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Missing Groq API key (set GROQ_API_KEY or send x-groq-api-key)" },
-      { status: 401 },
-    );
-  }
-
   let form: FormData;
   try {
     form = await req.formData();
@@ -21,6 +10,21 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "Expected multipart/form-data" },
       { status: 400 },
+    );
+  }
+
+  const formApiKeyRaw = form.get("groqApiKey");
+  const formApiKey = typeof formApiKeyRaw === "string" ? formApiKeyRaw.trim() : "";
+
+  const apiKey =
+    process.env.GROQ_API_KEY?.trim() ||
+    req.headers.get("x-groq-api-key")?.trim() ||
+    formApiKey ||
+    null;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Missing Groq API key (set GROQ_API_KEY or save key in Settings)" },
+      { status: 401 },
     );
   }
 
