@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { groqApiKeyFromRequest } from "@/lib/groqServer";
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
@@ -16,14 +18,13 @@ export async function POST(req: Request) {
   const formApiKeyRaw = form.get("groqApiKey");
   const formApiKey = typeof formApiKeyRaw === "string" ? formApiKeyRaw.trim() : "";
 
-  const apiKey =
-    process.env.GROQ_API_KEY?.trim() ||
-    req.headers.get("x-groq-api-key")?.trim() ||
-    formApiKey ||
-    null;
+  const apiKey = groqApiKeyFromRequest(req, formApiKey);
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing Groq API key (set GROQ_API_KEY or save key in Settings)" },
+      {
+        error:
+          "Missing Groq API key (set GROQ_API_KEY or AI_API_KEY, or save key in Settings)",
+      },
       { status: 401 },
     );
   }

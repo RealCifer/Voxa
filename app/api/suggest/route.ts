@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 
+import {
+  GROQ_CHAT_COMPLETIONS_MODEL,
+  groqApiKeyFromRequest,
+  groqUpstreamErrorSummary,
+} from "@/lib/groqServer";
+
 export const runtime = "nodejs";
 
 type SuggestionKind = "question" | "answer" | "clarification" | "fact-check";
@@ -16,14 +22,13 @@ function safePreview(v: unknown): string {
 }
 
 export async function POST(req: Request) {
-  const apiKey =
-    process.env.GROQ_API_KEY?.trim() ||
-    req.headers.get("x-groq-api-key")?.trim() ||
-    null;
-
+  const apiKey = groqApiKeyFromRequest(req);
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing Groq API key (set GROQ_API_KEY or send x-groq-api-key)" },
+      {
+        error:
+          "Missing Groq API key (set GROQ_API_KEY or AI_API_KEY, or send x-groq-api-key)",
+      },
       { status: 401 },
     );
   }
@@ -74,7 +79,7 @@ export async function POST(req: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-oss-120b",
+      model: GROQ_CHAT_COMPLETIONS_MODEL,
       temperature: 0.2,
       max_tokens: 220,
       response_format: { type: "json_object" },
@@ -87,8 +92,13 @@ export async function POST(req: Request) {
 
   const raw = await res.text();
   if (!res.ok) {
+    const summary = groqUpstreamErrorSummary(res.status, raw);
     return NextResponse.json(
-      { error: "Groq suggestions failed", status: res.status, details: raw },
+      {
+        error: `Groq suggestions failed: ${summary}`,
+        status: res.status,
+        details: raw,
+      },
       { status: 502 },
     );
   }

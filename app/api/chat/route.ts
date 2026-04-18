@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { defaultVoxaConfig } from "@/lib/config";
+import {
+  GROQ_CHAT_COMPLETIONS_MODEL,
+  groqApiKeyFromRequest,
+  groqUpstreamErrorSummary,
+} from "@/lib/groqServer";
 import { CHAT_TRANSCRIPT_MAX_CHARS } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
@@ -25,14 +30,13 @@ function coerceMessages(raw: unknown): Turn[] | null {
 }
 
 export async function POST(req: Request) {
-  const apiKey =
-    process.env.GROQ_API_KEY?.trim() ||
-    req.headers.get("x-groq-api-key")?.trim() ||
-    null;
-
+  const apiKey = groqApiKeyFromRequest(req);
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing Groq API key (set GROQ_API_KEY or send x-groq-api-key)" },
+      {
+        error:
+          "Missing Groq API key (set GROQ_API_KEY or AI_API_KEY, or add your key in Settings)",
+      },
       { status: 401 },
     );
   }
@@ -121,7 +125,7 @@ export async function POST(req: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-oss-120b",
+      model: GROQ_CHAT_COMPLETIONS_MODEL,
       temperature: suggestion ? 0.35 : 0.45,
       max_tokens: MAX_OUTPUT_TOKENS,
       messages: [{ role: "system", content: system }, ...messages],
@@ -130,8 +134,13 @@ export async function POST(req: Request) {
 
   const raw = await res.text();
   if (!res.ok) {
+    const summary = groqUpstreamErrorSummary(res.status, raw);
     return NextResponse.json(
-      { error: "Groq chat failed", status: res.status, details: raw },
+      {
+        error: `Groq chat failed: ${summary}`,
+        status: res.status,
+        details: raw,
+      },
       { status: 502 },
     );
   }
