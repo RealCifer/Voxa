@@ -34,6 +34,8 @@ export type VoxaConfig = {
   /** System instructions when a suggestion card is opened; supports {{recent_transcript}} and {{suggestion}}. */
   detailPrompt: string;
   suggestionContextWindow: number;
+  /** Last N seconds of timed transcript used for suggestion smart context (server clamps 15–600). */
+  suggestionSmartSeconds: number;
   chatContextWindow: number;
   /** Max characters of transcript (after dedupe) sent with chat / suggestion-detail requests. */
   chatTranscriptMaxChars: number;

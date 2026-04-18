@@ -64,6 +64,7 @@ export const defaultVoxaConfig: VoxaConfig = {
   chatPrompt: defaultChatPrompt,
   detailPrompt: defaultDetailPrompt,
   suggestionContextWindow: 10,
+  suggestionSmartSeconds: 90,
   chatContextWindow: 16,
   chatTranscriptMaxChars: 8192,
   suggestionTranscriptMaxChars: 2048,
@@ -83,6 +84,10 @@ export function loadVoxaConfig(): VoxaConfig {
         typeof parsed.suggestionContextWindow === "number"
           ? parsed.suggestionContextWindow
           : defaultVoxaConfig.suggestionContextWindow,
+      suggestionSmartSeconds:
+        typeof parsed.suggestionSmartSeconds === "number"
+          ? parsed.suggestionSmartSeconds
+          : defaultVoxaConfig.suggestionSmartSeconds,
       chatContextWindow:
         typeof parsed.chatContextWindow === "number"
           ? parsed.chatContextWindow

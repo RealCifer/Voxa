@@ -17,6 +17,8 @@ export default function SettingsPage() {
   const canSave = useMemo(
     () =>
       config.suggestionContextWindow > 0 &&
+      config.suggestionSmartSeconds >= 15 &&
+      config.suggestionSmartSeconds <= 600 &&
       config.chatContextWindow > 0 &&
       config.chatTranscriptMaxChars >= 512 &&
       config.suggestionTranscriptMaxChars >= 400 &&
@@ -85,7 +87,7 @@ export default function SettingsPage() {
             Prompts & context
           </h2>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <label className="space-y-1">
               <div className="text-xs text-neutral-600 dark:text-neutral-400">Suggestion context window</div>
               <input
@@ -100,6 +102,25 @@ export default function SettingsPage() {
                   }))
                 }
               />
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Last N transcript segments for fallback text and payload size.</p>
+            </label>
+
+            <label className="space-y-1">
+              <div className="text-xs text-neutral-600 dark:text-neutral-400">Suggestion smart window (sec)</div>
+              <input
+                type="number"
+                min={15}
+                max={600}
+                className="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+                value={config.suggestionSmartSeconds}
+                onChange={(e) =>
+                  setConfig((c) => ({
+                    ...c,
+                    suggestionSmartSeconds: Number(e.target.value),
+                  }))
+                }
+              />
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Timed overlap at the end of the live transcript sent to suggestions (15–600).</p>
             </label>
 
             <label className="space-y-1">

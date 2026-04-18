@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { defaultVoxaConfig } from "@/lib/config";
+import {
+  optimizeTranscriptForSuggestions,
+  parseSuggestionSegments,
+} from "@/lib/contextWindow";
 import { GroqFetchError, groqFetch } from "@/lib/groqClient";
 import { GROQ_CHAT_COMPLETIONS_MODEL, groqApiKeyFromRequest } from "@/lib/groqServer";
-import { dedupeConsecutiveLines } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
 
@@ -71,11 +74,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Expected JSON body" }, { status: 400 });
   }
 
-  const { transcript, prompt, maxTranscriptChars } = (body ?? {}) as {
-    transcript?: unknown;
-    prompt?: unknown;
-    maxTranscriptChars?: unknown;
-  };
+  const { transcript, prompt, maxTranscriptChars, segments, lineLimit, smartSeconds } =
+    (body ?? {}) as {
+      transcript?: unknown;
+      prompt?: unknown;
+      maxTranscriptChars?: unknown;
+      segments?: unknown;
+      lineLimit?: unknown;
+      smartSeconds?: unknown;
+    };
 
   if (typeof transcript !== "string") {
     return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
@@ -87,7 +94,15 @@ export async function POST(req: Request) {
     8000,
     defaultVoxaConfig.suggestionTranscriptMaxChars,
   );
-  const transcriptTrimmed = dedupeConsecutiveLines(transcript.trim()).slice(-cap);
+  const lineLimitClamped = clampInt(lineLimit, 5, 80, 24);
+  const smartS = clampInt(smartSeconds, 15, 600, 90);
+  const segParsed = parseSuggestionSegments(segments);
+
+  const transcriptTrimmed = optimizeTranscriptForSuggestions(transcript, segParsed, {
+    charCap: cap,
+    lineLimit: lineLimitClamped,
+    smartSeconds: smartS,
+  });
   if (!transcriptTrimmed) {
     return NextResponse.json({ suggestions: [] }, { status: 200 });
   }

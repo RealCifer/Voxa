@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
 
+import {
+  optimizeTranscriptForSuggestions,
+  parseSuggestionSegments,
+} from "@/lib/contextWindow";
 import { GroqFetchError, groqFetch } from "@/lib/groqClient";
 import { GROQ_CHAT_COMPLETIONS_MODEL, groqApiKeyFromRequest } from "@/lib/groqServer";
-import { dedupeConsecutiveLines } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
 
-/** Tail cap so we never ship an unbounded transcript to the model. */
-const TRANSCRIPT_SNIPPET_MAX_CHARS = 2200;
-
+const DEFAULT_CHAR_CAP = 2200;
 const MAX_WORDS = 20;
 const MAX_TOKENS = 150;
 const TEMPERATURE = 0.6;
 
 type SuggestionType = "question" | "insight" | "clarification";
+
+function clampInt(n: unknown, min: number, max: number, fallback: number): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
 
 function maxWords(text: string, limit: number): string {
   const w = text.trim().split(/\s+/).filter(Boolean);
@@ -26,14 +32,6 @@ function coerceType(raw: unknown): SuggestionType {
   if (t === "insight" || t === "idea" || t === "answer") return "insight";
   if (t === "clarification" || t === "fact-check" || t === "fact_check") return "clarification";
   return "clarification";
-}
-
-function snippetFromTranscript(raw: string): string {
-  const deduped = dedupeConsecutiveLines(raw.trim());
-  if (!deduped) return "";
-  return deduped.length > TRANSCRIPT_SNIPPET_MAX_CHARS
-    ? deduped.slice(-TRANSCRIPT_SNIPPET_MAX_CHARS)
-    : deduped;
 }
 
 function extractList(parsed: unknown): unknown[] {
@@ -58,7 +56,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Expected JSON body" }, { status: 400 });
   }
 
-  const b = (body ?? {}) as { transcript?: unknown; apiKey?: unknown };
+  const b = (body ?? {}) as {
+    transcript?: unknown;
+    apiKey?: unknown;
+    segments?: unknown;
+    lineLimit?: unknown;
+    smartSeconds?: unknown;
+    maxTranscriptChars?: unknown;
+  };
 
   if (typeof b.transcript !== "string") {
     return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
@@ -73,7 +78,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const snippet = snippetFromTranscript(b.transcript);
+  const cap = clampInt(b.maxTranscriptChars, 400, 8000, DEFAULT_CHAR_CAP);
+  const lineLimitClamped = clampInt(b.lineLimit, 5, 80, 24);
+  const smartS = clampInt(b.smartSeconds, 15, 600, 90);
+  const segParsed = parseSuggestionSegments(b.segments);
+
+  const snippet = optimizeTranscriptForSuggestions(b.transcript, segParsed, {
+    charCap: cap,
+    lineLimit: lineLimitClamped,
+    smartSeconds: smartS,
+  });
   if (!snippet) {
     return NextResponse.json({ suggestions: [] as LiveSuggestionItem[] });
   }
@@ -84,7 +98,7 @@ export async function POST(req: Request) {
     "Exactly one question, one insight, one clarification. Each text ≤20 words. No other keys.",
   ].join(" ");
 
-  const user = `Recent conversation (truncated tail, deduped lines):\n${snippet}`;
+  const user = `Recent conversation (optimized context):\n${snippet}`;
 
   try {
     const raw = await groqFetch<{

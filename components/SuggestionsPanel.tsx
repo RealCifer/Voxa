@@ -34,6 +34,20 @@ export function SuggestionsPanel() {
     [config.suggestionContextWindow, config.suggestionTranscriptMaxChars, transcript],
   );
 
+  /** Timed tail for `/api/suggest` smart window (`getSmartContext`); keeps payload bounded. */
+  const segmentsForSuggest = useMemo(() => {
+    const n = Math.min(
+      transcript.length,
+      Math.max(config.suggestionContextWindow, 150),
+    );
+    return transcript.slice(-n).map((s) => ({
+      id: s.id,
+      text: s.text,
+      startMs: s.startMs,
+      ...(s.endMs !== undefined ? { endMs: s.endMs } : {}),
+    }));
+  }, [config.suggestionContextWindow, transcript]);
+
   async function refreshOnce() {
     if (!recentTranscript) return;
     const hash = `${transcript.length}:${recentTranscript.slice(-160)}`;
@@ -52,6 +66,9 @@ export function SuggestionsPanel() {
         },
         body: JSON.stringify({
           transcript: recentTranscript,
+          segments: segmentsForSuggest,
+          lineLimit: Math.min(80, Math.max(24, config.suggestionContextWindow * 2)),
+          smartSeconds: config.suggestionSmartSeconds,
           prompt: config.suggestionPrompt,
           maxTranscriptChars: config.suggestionTranscriptMaxChars,
         }),
