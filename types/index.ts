@@ -12,6 +12,12 @@ export type Suggestion = {
   source?: "llm" | "rule" | "user";
 };
 
+export type SuggestionBatch = {
+  id: string;
+  createdAt: string;
+  items: [Suggestion, Suggestion, Suggestion];
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
