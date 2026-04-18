@@ -13,7 +13,7 @@ Browser workspace for **live microphone capture**, **Groq Whisper transcription*
 
 3. **Groq API key** (either or both):
    - **Server**: set `GROQ_API_KEY` or `AI_API_KEY` in `.env` (loaded via `next.config.ts` + `dotenv`).
-   - **Browser**: open **Settings**, paste the key, **Save** (stored in `localStorage` under `voxa.groqApiKey.v1`). The app sends `x-groq-api-key` on requests when present.
+   - **Browser**: open **Settings**, paste the key, **Save** (stored in `localStorage` under `voxa.groqApiKey.v1`). Transcription uses header `x-api-key`; chat/suggest also accept `x-groq-api-key`.
 
 4. Run the dev server:
 

@@ -8,6 +8,7 @@ export function groqApiKeyFromRequest(req: Request, formOrHeaderFallback?: strin
   return (
     process.env.GROQ_API_KEY?.trim() ||
     process.env.AI_API_KEY?.trim() ||
+    req.headers.get("x-api-key")?.trim() ||
     req.headers.get("x-groq-api-key")?.trim() ||
     (fromForm || null)
   );

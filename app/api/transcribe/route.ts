@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
 
-import { groqApiKeyFromRequest } from "@/lib/groqServer";
+import { GROQ_OPENAI_BASE } from "@/lib/groqClient";
+import { groqApiKeyFromRequest, groqUpstreamErrorSummary } from "@/lib/groqServer";
 
 export const runtime = "nodejs";
+
+function resolveAudioFile(form: FormData): File | null {
+  const file = form.get("file");
+  if (file instanceof File && file.size > 0) return file;
+  const audio = form.get("audio");
+  if (audio instanceof File && audio.size > 0) return audio;
+  return null;
+}
 
 export async function POST(req: Request) {
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json(
-      { error: "Expected multipart/form-data" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
   }
 
   const formApiKeyRaw = form.get("groqApiKey");
@@ -23,48 +29,51 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Missing Groq API key (set GROQ_API_KEY or AI_API_KEY, or save key in Settings)",
+          "Missing API key: send header x-api-key (or x-groq-api-key), or set GROQ_API_KEY / AI_API_KEY on the server.",
       },
       { status: 401 },
     );
   }
 
-  const file = form.get("file");
-  if (!(file instanceof File)) {
+  const file = resolveAudioFile(form);
+  if (!file) {
     return NextResponse.json(
-      { error: "Missing form field: file" },
+      { error: "Missing audio file: use form field \"file\" or \"audio\"." },
       { status: 400 },
     );
   }
 
   const upstream = new FormData();
-  upstream.set("file", file, file.name || "chunk.webm");
+  upstream.set("file", file, file.name || "audio.webm");
   upstream.set("model", "whisper-large-v3");
 
-  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+  const url = `${GROQ_OPENAI_BASE}/audio/transcriptions`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: upstream,
   });
 
   const raw = await res.text();
   if (!res.ok) {
+    const summary = groqUpstreamErrorSummary(res.status, raw);
     return NextResponse.json(
-      { error: "Groq transcription failed", status: res.status, details: raw },
+      {
+        error: `Transcription failed: ${summary}`,
+        status: res.status,
+        details: raw,
+      },
       { status: 502 },
     );
   }
 
   try {
     const json = JSON.parse(raw) as { text?: string };
-    return NextResponse.json({ text: json.text ?? "" });
+    return NextResponse.json({ text: typeof json.text === "string" ? json.text : "" });
   } catch {
     return NextResponse.json(
-      { error: "Invalid upstream JSON", details: raw },
+      { error: "Invalid JSON from transcription service", details: raw },
       { status: 502 },
     );
   }
 }
-

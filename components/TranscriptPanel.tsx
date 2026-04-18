@@ -65,7 +65,7 @@ export function TranscriptPanel() {
           body.set("groqApiKey", apiKey);
           const res = await fetch("/api/transcribe", {
             method: "POST",
-            headers: apiKey ? { "x-groq-api-key": apiKey } : undefined,
+            headers: apiKey ? { "x-api-key": apiKey } : undefined,
             body,
           });
           const json = (await res.json()) as { text?: string; error?: string };
