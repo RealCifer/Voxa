@@ -30,6 +30,7 @@ export type AudioChunk = {
 export type VoxaConfig = {
   suggestionPrompt: string;
   chatPrompt: string;
+  /** System instructions when a suggestion card is opened; supports {{recent_transcript}} and {{suggestion}}. */
   detailPrompt: string;
   suggestionContextWindow: number;
   chatContextWindow: number;

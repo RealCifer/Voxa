@@ -22,11 +22,35 @@ OUTPUT:
 Return ONLY valid JSON: {"suggestions":[{"type":"question","text":"..."},{"type":"insight","text":"..."},{"type":"clarification","text":"..."}]}
 Use type exactly: question, insight, clarification — one of each.`;
 
+const defaultDetailPrompt = `You are an expert meeting assistant.
+A user clicked on a suggestion during a live conversation.
+CONTEXT:
+{{recent_transcript}}
+SELECTED SUGGESTION:
+{{suggestion}}
+TASK:
+Provide a clear, detailed, and helpful response.
+RULES:
+- Be concise but informative
+- Use structured explanation if needed
+- Stay relevant to conversation
+- Do not repeat transcript
+- Do not hallucinate unknown facts
+STYLE:
+- Professional
+- Direct
+- Actionable
+
+If applicable, include:
+- bullet points
+- examples
+- next steps`;
+
 export const defaultVoxaConfig: VoxaConfig = {
   suggestionPrompt: defaultSuggestionPrompt,
   chatPrompt:
     "Answer clearly and concretely. Use brief bullets when helpful. Ask clarifying questions only if needed.",
-  detailPrompt: "Expand with specifics and structure; stay grounded in the transcript.",
+  detailPrompt: defaultDetailPrompt,
   suggestionContextWindow: 10,
   chatContextWindow: 16,
   chatTranscriptMaxChars: 8192,

@@ -17,6 +17,9 @@ const MAX_OUTPUT_TOKENS_DETAIL = 3072;
 const DEFAULT_HISTORY_LIMIT = defaultVoxaConfig.chatMaxMessages;
 const DEFAULT_TRANSCRIPT_CAP = defaultVoxaConfig.chatTranscriptMaxChars;
 
+const PLACEHOLDER_TRANSCRIPT = "{{recent_transcript}}";
+const PLACEHOLDER_SUGGESTION = "{{suggestion}}";
+
 type Turn = { role: "user" | "assistant"; content: string };
 
 function clampInt(n: unknown, min: number, max: number, fallback: number): number {
@@ -54,24 +57,36 @@ function coerceSuggestion(raw: unknown): SuggestionPayload | undefined {
   return undefined;
 }
 
-function buildSystemPrompt(
-  chatPrompt: string,
-  detailPrompt: string,
-  transcriptBlock: string,
-  suggestion: SuggestionPayload | undefined,
-): string {
+function buildNormalSystem(chatPrompt: string, transcriptBlock: string): string {
   const head =
     "Transcript assistant. Markdown prose. Use TRANSCRIPT when relevant; do not paste it wholesale.";
-  if (suggestion) {
-    return [
-      head,
-      `Rules: ${chatPrompt}`,
-      `TRANSCRIPT:\n${transcriptBlock}`,
-      `User chose suggestion [${suggestion.kind}]: ${suggestion.preview}`,
-      `Expand: ${detailPrompt}`,
-    ].join("\n\n");
-  }
   return [head, `Rules: ${chatPrompt}`, `TRANSCRIPT:\n${transcriptBlock}`].join("\n\n");
+}
+
+/** Filled template (placeholders) or legacy stacked instructions if the prompt has no placeholders. */
+function buildSuggestionSystem(
+  detailPrompt: string,
+  chatPrompt: string,
+  transcriptBlock: string,
+  suggestion: SuggestionPayload,
+): string {
+  const suggestionLine = `[${suggestion.kind}] ${suggestion.preview}`;
+  const tpl = detailPrompt.trim();
+  if (tpl.includes(PLACEHOLDER_TRANSCRIPT) || tpl.includes(PLACEHOLDER_SUGGESTION)) {
+    return tpl
+      .replaceAll(PLACEHOLDER_TRANSCRIPT, transcriptBlock)
+      .replaceAll(PLACEHOLDER_SUGGESTION, suggestionLine)
+      .slice(0, 24_000);
+  }
+  const head =
+    "Transcript assistant. Markdown prose. Use TRANSCRIPT when relevant; do not paste it wholesale.";
+  return [
+    head,
+    `Rules: ${chatPrompt}`,
+    `TRANSCRIPT:\n${transcriptBlock}`,
+    `User chose suggestion [${suggestion.kind}]: ${suggestion.preview}`,
+    `Expand: ${tpl}`,
+  ].join("\n\n");
 }
 
 export async function POST(req: Request) {
@@ -133,11 +148,13 @@ export async function POST(req: Request) {
 
   const detailPrompt =
     typeof b.detailPrompt === "string" && b.detailPrompt.trim()
-      ? b.detailPrompt.trim().slice(0, 2000)
+      ? b.detailPrompt.trim().slice(0, 12_000)
       : defaultVoxaConfig.detailPrompt;
 
   const suggestion = coerceSuggestion(b.suggestion);
-  const system = buildSystemPrompt(chatPrompt, detailPrompt, transcriptBlock, suggestion);
+  const system = suggestion
+    ? buildSuggestionSystem(detailPrompt, chatPrompt, transcriptBlock, suggestion)
+    : buildNormalSystem(chatPrompt, transcriptBlock);
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",

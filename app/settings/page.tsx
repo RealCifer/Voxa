@@ -201,12 +201,22 @@ export default function SettingsPage() {
           </label>
 
           <label className="space-y-1">
-            <div className="text-xs text-neutral-600 dark:text-neutral-400">Detail prompt</div>
+            <div className="text-xs text-neutral-600 dark:text-neutral-400">
+              Suggestion reply (when user clicks a card)
+            </div>
             <textarea
-              className="min-h-[7rem] w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+              className="min-h-[14rem] w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
               value={config.detailPrompt}
               onChange={(e) => setConfig((c) => ({ ...c, detailPrompt: e.target.value }))}
+              spellCheck={false}
             />
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Placeholders:{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">{"{{recent_transcript}}"}</code>,{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">{"{{suggestion}}"}</code> (filled as{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">[kind] text</code>). If you omit both,
+              the app falls back to a short system prompt plus this text as an &quot;Expand&quot; line.
+            </p>
           </label>
         </section>
 
