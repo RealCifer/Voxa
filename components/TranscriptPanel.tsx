@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
 import { useAppStore } from "@/lib/store/app-store";
 
-const CHUNK_TIMESLICE_MS = 5_000; // <= 30s for easier testing
+const CHUNK_TIMESLICE_MS = 30_000; // <= 30s per requirement
 
 export function TranscriptPanel() {
   const transcript = useAppStore((s) => s.transcript);
