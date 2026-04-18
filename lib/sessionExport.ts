@@ -3,7 +3,6 @@ import type { ChatMessage, SuggestionBatch, TranscriptSegment } from "@/types";
 export const SESSION_EXPORT_SCHEMA_VERSION = 1 as const;
 
 export type SessionExportTranscriptSegment = TranscriptSegment & {
-  /** Session-relative offset from `startMs` (e.g. `0:05.000`). */
   startOffsetLabel: string;
   endOffsetLabel?: string;
 };
@@ -42,7 +41,6 @@ function pad3(n: number) {
   return String(n).padStart(3, "0");
 }
 
-/** Human-readable offset from session start (uses `startMs` / `endMs` on segments). */
 export function formatSessionOffsetMs(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "0:00.000";
   const totalMs = Math.floor(ms);

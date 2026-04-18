@@ -1,31 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useRealtimeSession } from "@/hooks/useRealtimeSession";
 import { buildSessionExport, downloadSessionJson } from "@/lib/sessionExport";
 import { useAppStore } from "@/lib/store/app-store";
 
-const sessionBadge: Record<string, string> = {
-  idle: "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
-  connecting: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100",
-  active: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100",
-  reconnecting: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100",
-  error: "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100",
-};
-
 export function AppHeader() {
   const sessionLabel = useAppStore((s) => s.sessionLabel);
-  const { state } = useRealtimeSession();
+  const isMicActive = useAppStore((s) => s.isMicActive);
 
   function onExportSession() {
     const { transcript, suggestionBatches, chat, sessionLabel: label } = useAppStore.getState();
-    const payload = buildSessionExport({
-      sessionLabel: label,
-      transcript,
-      suggestionBatches,
-      chat,
-    });
-    downloadSessionJson(payload);
+    downloadSessionJson(
+      buildSessionExport({
+        sessionLabel: label,
+        transcript,
+        suggestionBatches,
+        chat,
+      }),
+    );
   }
 
   return (
@@ -36,13 +28,13 @@ export function AppHeader() {
         </h1>
         <p className="truncate text-xs text-neutral-500 dark:text-neutral-500">{sessionLabel}</p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           onClick={onExportSession}
           className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
         >
-          Export Session
+          Export session
         </button>
         <Link
           href="/settings"
@@ -51,9 +43,14 @@ export function AppHeader() {
           Settings
         </Link>
         <span
-          className={`rounded-full px-2 py-0.5 text-xs capitalize ${sessionBadge[state] ?? sessionBadge.idle}`}
+          className={`rounded-full px-2 py-0.5 text-xs ${
+            isMicActive
+              ? "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100"
+              : "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          }`}
+          title={isMicActive ? "Microphone is on" : "Microphone is off"}
         >
-          {state}
+          {isMicActive ? "Recording" : "Mic idle"}
         </span>
       </div>
     </header>

@@ -81,12 +81,28 @@ export function SuggestionsPanel() {
         return;
       }
 
-      const items = suggestions.map((s) => ({
-        id: crypto.randomUUID(),
-        kind: (s.kind ?? "clarification") as "question" | "answer" | "clarification" | "fact-check",
-        preview: (s.preview ?? "").trim(),
-        source: "llm" as const,
-      }));
+      const items = suggestions
+        .map((s) => {
+          const row = s as { kind?: string; type?: string; preview?: string; text?: string };
+          const kindRaw = row.kind ?? row.type ?? "clarification";
+          const kind =
+            kindRaw === "question" || kindRaw === "insight" || kindRaw === "clarification"
+              ? kindRaw
+              : "clarification";
+          const preview = (row.preview ?? row.text ?? "").trim();
+          return {
+            id: crypto.randomUUID(),
+            kind,
+            preview,
+            source: "llm" as const,
+          };
+        })
+        .filter((x) => x.preview.length > 0);
+
+      if (items.length !== 3) {
+        setRefreshError("Suggestions response was invalid. Try Refresh again.");
+        return;
+      }
 
       prependBatch(items as never);
     } catch (e) {

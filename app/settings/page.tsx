@@ -175,12 +175,20 @@ export default function SettingsPage() {
           </p>
 
           <label className="space-y-1">
-            <div className="text-xs text-neutral-600 dark:text-neutral-400">Suggestion prompt</div>
+            <div className="text-xs text-neutral-600 dark:text-neutral-400">Meeting copilot prompt</div>
             <textarea
-              className="min-h-[7rem] w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+              className="min-h-[14rem] w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
               value={config.suggestionPrompt}
               onChange={(e) => setConfig((c) => ({ ...c, suggestionPrompt: e.target.value }))}
+              spellCheck={false}
             />
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Use <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">{"{{recent_transcript}}"}</code>{" "}
+              where the live excerpt should go; the API still enforces JSON with{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">suggestions</code>,{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">type</code>, and{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">text</code>.
+            </p>
           </label>
 
           <label className="space-y-1">

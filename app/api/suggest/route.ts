@@ -10,22 +10,49 @@ import { dedupeConsecutiveLines } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
 
-type SuggestionKind = "question" | "answer" | "clarification" | "fact-check";
+type SuggestionKind = "question" | "insight" | "clarification";
 
-function coerceKind(kind: unknown): SuggestionKind {
-  return kind === "question" || kind === "answer" || kind === "clarification" || kind === "fact-check"
-    ? kind
-    : "clarification";
-}
-
-function safePreview(v: unknown): string {
-  if (typeof v !== "string") return "";
-  return v.trim().replaceAll(/\s+/g, " ").slice(0, 140);
-}
+const PLACEHOLDER = "{{recent_transcript}}";
 
 function clampInt(n: unknown, min: number, max: number, fallback: number): number {
   if (typeof n !== "number" || !Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+function maxWords(text: string, limit: number): string {
+  const w = text.trim().split(/\s+/).filter(Boolean);
+  return w.slice(0, limit).join(" ");
+}
+
+function coerceKind(raw: unknown): SuggestionKind {
+  const t = typeof raw === "string" ? raw.toLowerCase().trim() : "";
+  if (t === "question") return "question";
+  if (t === "insight" || t === "idea" || t === "answer") return "insight";
+  if (t === "clarification" || t === "fact-check" || t === "fact_check") return "clarification";
+  return "clarification";
+}
+
+function suggestionText(item: { text?: unknown; preview?: unknown }): string {
+  if (typeof item.text === "string" && item.text.trim()) return item.text.trim();
+  if (typeof item.preview === "string") return item.preview.trim();
+  return "";
+}
+
+function extractRawList(parsed: unknown): unknown[] {
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === "object" && "suggestions" in parsed) {
+    const s = (parsed as { suggestions: unknown }).suggestions;
+    return Array.isArray(s) ? s : [];
+  }
+  return [];
+}
+
+function buildUserPrompt(template: string, transcript: string): string {
+  const trimmedTemplate = template.trim().slice(0, 12_000);
+  if (trimmedTemplate.includes(PLACEHOLDER)) {
+    return trimmedTemplate.replaceAll(PLACEHOLDER, transcript);
+  }
+  return `${trimmedTemplate}\n\nCONTEXT:\n${transcript}`;
 }
 
 export async function POST(req: Request) {
@@ -68,17 +95,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ suggestions: [] }, { status: 200 });
   }
 
-  const suggestionPrompt =
+  const template =
     typeof prompt === "string" && prompt.trim()
-      ? prompt.trim().slice(0, 1500)
-      : "3 concise standalone suggestions to proceed.";
+      ? prompt
+      : defaultVoxaConfig.suggestionPrompt;
+
+  const userContent = buildUserPrompt(template, transcriptTrimmed);
 
   const system = [
-    "Output ONLY JSON: { \"suggestions\": [ { \"kind\": \"question|answer|clarification|fact-check\", \"preview\": \"...\" } ] }",
-    "Exactly 3 items. preview ≤140 chars. No extra keys.",
+    "Meeting copilot. Output ONLY JSON: an object with key suggestions (array of length 3).",
+    'Each element: {"type":"question"|"insight"|"clarification","text":"..."}.',
+    "Exactly one question, one insight, one clarification. Each text ≤20 words. No prose, no extra keys.",
   ].join(" ");
-
-  const user = `Task: ${suggestionPrompt}\nTranscript:\n${transcriptTrimmed}`;
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -88,12 +116,12 @@ export async function POST(req: Request) {
     },
     body: JSON.stringify({
       model: GROQ_CHAT_COMPLETIONS_MODEL,
-      temperature: 0.2,
-      max_tokens: 200,
+      temperature: 0.25,
+      max_tokens: 320,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
-        { role: "user", content: user },
+        { role: "user", content: userContent },
       ],
     }),
   });
@@ -116,15 +144,15 @@ export async function POST(req: Request) {
       choices?: Array<{ message?: { content?: string } }>;
     };
     const content = json.choices?.[0]?.message?.content ?? "";
-    const parsed = JSON.parse(content) as { suggestions?: unknown };
-    const arr = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const parsed = JSON.parse(content) as unknown;
+    const arr = extractRawList(parsed);
 
     const normalized = arr
       .slice(0, 3)
-      .map((s) => s as { kind?: unknown; preview?: unknown })
+      .map((s) => s as { type?: unknown; kind?: unknown; text?: unknown; preview?: unknown })
       .map((s) => ({
-        kind: coerceKind(s.kind),
-        preview: safePreview(s.preview),
+        kind: coerceKind(s.type ?? s.kind),
+        preview: maxWords(suggestionText(s), 20),
       }))
       .filter((s) => s.preview.length > 0);
 
@@ -132,14 +160,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ suggestions: normalized });
     }
   } catch {
-    // fall through to strict fallback
+    // fall through
   }
 
   return NextResponse.json({
     suggestions: [
-      { kind: "clarification", preview: "What’s the desired outcome of this discussion?" },
-      { kind: "question", preview: "What’s the next concrete step we should take?" },
-      { kind: "fact-check", preview: "Which assumption here is most likely wrong?" },
+      {
+        kind: "question" as const,
+        preview: "What decision do we need from this meeting before we leave?",
+      },
+      {
+        kind: "insight" as const,
+        preview: "Naming one owner per action item would close the loop you’re circling.",
+      },
+      {
+        kind: "clarification" as const,
+        preview: "Confirm the deadline everyone just implied—is it end of week or next sprint?",
+      },
     ],
   });
 }

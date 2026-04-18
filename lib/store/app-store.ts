@@ -31,14 +31,14 @@ const seedSuggestionBatches: SuggestionBatch[] = [
       },
       {
         id: "seed-s2",
-        kind: "clarification",
-        preview: "Clarify scope: what’s explicitly in/out for this iteration?",
+        kind: "insight",
+        preview: "Splitting the work into two milestones would reduce risk on the unknown piece.",
         source: "llm",
       },
       {
         id: "seed-s3",
-        kind: "fact-check",
-        preview: "Verify assumptions: are we optimizing for speed, cost, or accuracy?",
+        kind: "clarification",
+        preview: "When you said “done,” did you mean shipped to users or code-complete?",
         source: "llm",
       },
     ],

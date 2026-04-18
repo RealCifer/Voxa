@@ -51,9 +51,6 @@ export function TranscriptPanel() {
 
         pushAudioChunk(chunk);
 
-        console.log("[audio chunk]", chunk);
-
-        // Send chunk to backend for transcription (no streaming yet).
         try {
           const filename = `chunk-${chunkIndexRef.current}.webm`;
           const file = new File([chunk.blob], filename, { type: chunk.mimeType });
@@ -170,24 +167,24 @@ export function TranscriptPanel() {
           <div className="rounded border border-neutral-200 p-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
             <div className="flex items-center justify-between gap-2">
               <span>
-                Status: <span className="font-medium">{isMicActive ? "recording" : "idle"}</span>
+                Mic: <span className="font-medium">{isMicActive ? "on" : "off"}</span>
               </span>
               <span>
-                Chunks: <span className="font-medium">{audioChunks.length}</span>
+                Chunks sent: <span className="font-medium">{audioChunks.length}</span>
               </span>
             </div>
-            <div className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-              Chunking via MediaRecorder timeslice: {CHUNK_TIMESLICE_MS / 1000}s
-            </div>
+            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+              Each chunk is about {CHUNK_TIMESLICE_MS / 1000}s of audio, then transcribed via Groq.
+            </p>
           </div>
 
           <div className="space-y-2">
             <div className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-              Audio chunks (logged as blobs)
+              Recent audio chunks
             </div>
             {audioChunks.length === 0 ? (
               <p className="text-neutral-500 dark:text-neutral-500">
-                Click Start recording. Each chunk will be logged to the console as a Blob.
+                Start recording to capture audio. Chunks appear here after each slice.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -219,7 +216,7 @@ export function TranscriptPanel() {
           {transcript.length > 0 ? (
             <div className="space-y-2">
               <div className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                Transcript (placeholder)
+                Transcript
               </div>
               <ul className="space-y-2">
                 {transcript.map((seg) => (

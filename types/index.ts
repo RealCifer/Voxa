@@ -8,7 +8,7 @@ export type TranscriptSegment = {
 
 export type Suggestion = {
   id: string;
-  kind: "question" | "answer" | "clarification" | "fact-check";
+  kind: "question" | "insight" | "clarification";
   preview: string;
   source?: "llm" | "rule" | "user";
 };
@@ -47,10 +47,3 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
 };
-
-export type RealtimeSessionState =
-  | "idle"
-  | "connecting"
-  | "active"
-  | "reconnecting"
-  | "error";
