@@ -6,13 +6,23 @@ import {
   groqApiKeyFromRequest,
   groqUpstreamErrorSummary,
 } from "@/lib/groqServer";
-import { CHAT_TRANSCRIPT_MAX_CHARS } from "@/lib/transcriptFormat";
+import { dedupeConsecutiveLines, LLM_TRANSCRIPT_HARD_CAP } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
+
 const CHAT_MESSAGE_MAX = 80;
-const MAX_OUTPUT_TOKENS = 4096;
+const CHAT_MESSAGE_CONTENT_MAX = 12_000;
+const MAX_OUTPUT_TOKENS_CHAT = 1536;
+const MAX_OUTPUT_TOKENS_DETAIL = 3072;
+const DEFAULT_HISTORY_LIMIT = defaultVoxaConfig.chatMaxMessages;
+const DEFAULT_TRANSCRIPT_CAP = defaultVoxaConfig.chatTranscriptMaxChars;
 
 type Turn = { role: "user" | "assistant"; content: string };
+
+function clampInt(n: unknown, min: number, max: number, fallback: number): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
 
 function coerceMessages(raw: unknown): Turn[] | null {
   if (!Array.isArray(raw)) return null;
@@ -24,9 +34,44 @@ function coerceMessages(raw: unknown): Turn[] | null {
     if (typeof m.content !== "string") continue;
     const text = m.content.trim();
     if (!text) continue;
-    out.push({ role: m.role, content: text.slice(0, 24_000) });
+    out.push({ role: m.role, content: text.slice(0, CHAT_MESSAGE_CONTENT_MAX) });
   }
   return out.length ? out : null;
+}
+
+type SuggestionPayload = { kind: string; preview: string };
+
+function coerceSuggestion(raw: unknown): SuggestionPayload | undefined {
+  const s = raw as { kind?: unknown; preview?: unknown } | undefined;
+  if (
+    s &&
+    typeof s.kind === "string" &&
+    typeof s.preview === "string" &&
+    s.preview.trim()
+  ) {
+    return { kind: s.kind.trim().slice(0, 64), preview: s.preview.trim().slice(0, 2000) };
+  }
+  return undefined;
+}
+
+function buildSystemPrompt(
+  chatPrompt: string,
+  detailPrompt: string,
+  transcriptBlock: string,
+  suggestion: SuggestionPayload | undefined,
+): string {
+  const head =
+    "Transcript assistant. Markdown prose. Use TRANSCRIPT when relevant; do not paste it wholesale.";
+  if (suggestion) {
+    return [
+      head,
+      `Rules: ${chatPrompt}`,
+      `TRANSCRIPT:\n${transcriptBlock}`,
+      `User chose suggestion [${suggestion.kind}]: ${suggestion.preview}`,
+      `Expand: ${detailPrompt}`,
+    ].join("\n\n");
+  }
+  return [head, `Rules: ${chatPrompt}`, `TRANSCRIPT:\n${transcriptBlock}`].join("\n\n");
 }
 
 export async function POST(req: Request) {
@@ -54,13 +99,22 @@ export async function POST(req: Request) {
     chatPrompt?: unknown;
     detailPrompt?: unknown;
     suggestion?: unknown;
+    chatHistoryLimit?: unknown;
+    transcriptMaxChars?: unknown;
   };
 
   if (typeof b.transcript !== "string") {
     return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
   }
 
-  const transcript = b.transcript.trim().slice(-CHAT_TRANSCRIPT_MAX_CHARS);
+  const transcriptCap = clampInt(
+    b.transcriptMaxChars,
+    512,
+    LLM_TRANSCRIPT_HARD_CAP,
+    DEFAULT_TRANSCRIPT_CAP,
+  );
+  let transcript = dedupeConsecutiveLines(b.transcript.trim());
+  transcript = transcript.length > transcriptCap ? transcript.slice(-transcriptCap) : transcript;
   const transcriptBlock = transcript || "(No transcript captured yet.)";
 
   const messages = coerceMessages(b.messages);
@@ -68,55 +122,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing messages" }, { status: 400 });
   }
 
+  const historyLimit = clampInt(b.chatHistoryLimit, 2, 80, DEFAULT_HISTORY_LIMIT);
+  const trimmedMessages =
+    messages.length > historyLimit ? messages.slice(-historyLimit) : messages;
+
   const chatPrompt =
     typeof b.chatPrompt === "string" && b.chatPrompt.trim()
-      ? b.chatPrompt.trim()
+      ? b.chatPrompt.trim().slice(0, 4000)
       : defaultVoxaConfig.chatPrompt;
 
   const detailPrompt =
     typeof b.detailPrompt === "string" && b.detailPrompt.trim()
-      ? b.detailPrompt.trim()
+      ? b.detailPrompt.trim().slice(0, 2000)
       : defaultVoxaConfig.detailPrompt;
 
-  const suggestionRaw = b.suggestion as { kind?: unknown; preview?: unknown } | undefined;
-  const suggestion =
-    suggestionRaw &&
-    typeof suggestionRaw.kind === "string" &&
-    typeof suggestionRaw.preview === "string" &&
-    suggestionRaw.preview.trim()
-      ? {
-          kind: suggestionRaw.kind.trim().slice(0, 64),
-          preview: suggestionRaw.preview.trim().slice(0, 2000),
-        }
-      : undefined;
-
-  const systemParts = [
-    "You are a conversational assistant for a live, voice-transcribed workspace.",
-    "Respond in clear Markdown-friendly prose (not JSON). Ground your answer in the TRANSCRIPT when it is relevant.",
-    "Do not repeat the entire transcript back unless the user explicitly asks.",
-    "",
-    "User-configured assistant instructions:",
-    chatPrompt,
-    "",
-    "--- BEGIN TRANSCRIPT ---",
-    transcriptBlock,
-    "--- END TRANSCRIPT ---",
-  ];
-
-  if (suggestion) {
-    systemParts.push(
-      "",
-      "The user activated a suggestion card from the suggestions panel:",
-      `Kind: ${suggestion.kind}`,
-      `Suggestion text: ${suggestion.preview}`,
-      "",
-      "For this turn, expand on that suggestion with a substantive, detailed answer.",
-      detailPrompt,
-      "Use clear structure (short sections, bullets where helpful). Reference specific transcript lines or themes when useful. Close with concrete next steps or focused follow-up questions when appropriate.",
-    );
-  }
-
-  const system = systemParts.join("\n");
+  const suggestion = coerceSuggestion(b.suggestion);
+  const system = buildSystemPrompt(chatPrompt, detailPrompt, transcriptBlock, suggestion);
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -126,9 +147,9 @@ export async function POST(req: Request) {
     },
     body: JSON.stringify({
       model: GROQ_CHAT_COMPLETIONS_MODEL,
-      temperature: suggestion ? 0.35 : 0.45,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      messages: [{ role: "system", content: system }, ...messages],
+      temperature: 0.35,
+      max_tokens: suggestion ? MAX_OUTPUT_TOKENS_DETAIL : MAX_OUTPUT_TOKENS_CHAT,
+      messages: [{ role: "system", content: system }, ...trimmedMessages],
     }),
   });
 

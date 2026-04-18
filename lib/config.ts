@@ -3,14 +3,15 @@ import type { VoxaConfig } from "@/types";
 export const VOXA_CONFIG_STORAGE_KEY = "voxa.config.v1";
 
 export const defaultVoxaConfig: VoxaConfig = {
-  suggestionPrompt:
-    "You are an assistant that generates exactly 3 concise suggestions that help the user continue their work.",
+  suggestionPrompt: "Return 3 short, actionable next-step suggestions for this transcript.",
   chatPrompt:
-    "You are a helpful assistant. Give clear, substantive answers with structure when it helps. Ask clarifying questions when needed, and propose concrete next steps.",
-  detailPrompt:
-    "Rewrite the selected content with more detail and clarity while preserving meaning and tone.",
-  suggestionContextWindow: 12,
-  chatContextWindow: 24,
+    "Answer clearly and concretely. Use brief bullets when helpful. Ask clarifying questions only if needed.",
+  detailPrompt: "Expand with specifics and structure; stay grounded in the transcript.",
+  suggestionContextWindow: 10,
+  chatContextWindow: 16,
+  chatTranscriptMaxChars: 8192,
+  suggestionTranscriptMaxChars: 2048,
+  chatMaxMessages: 28,
 };
 
 export function loadVoxaConfig(): VoxaConfig {
@@ -30,6 +31,18 @@ export function loadVoxaConfig(): VoxaConfig {
         typeof parsed.chatContextWindow === "number"
           ? parsed.chatContextWindow
           : defaultVoxaConfig.chatContextWindow,
+      chatTranscriptMaxChars:
+        typeof parsed.chatTranscriptMaxChars === "number"
+          ? parsed.chatTranscriptMaxChars
+          : defaultVoxaConfig.chatTranscriptMaxChars,
+      suggestionTranscriptMaxChars:
+        typeof parsed.suggestionTranscriptMaxChars === "number"
+          ? parsed.suggestionTranscriptMaxChars
+          : defaultVoxaConfig.suggestionTranscriptMaxChars,
+      chatMaxMessages:
+        typeof parsed.chatMaxMessages === "number"
+          ? parsed.chatMaxMessages
+          : defaultVoxaConfig.chatMaxMessages,
     };
   } catch {
     return defaultVoxaConfig;

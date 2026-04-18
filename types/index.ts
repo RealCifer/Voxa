@@ -33,6 +33,12 @@ export type VoxaConfig = {
   detailPrompt: string;
   suggestionContextWindow: number;
   chatContextWindow: number;
+  /** Max characters of transcript (after dedupe) sent with chat / suggestion-detail requests. */
+  chatTranscriptMaxChars: number;
+  /** Max characters of transcript sent when refreshing suggestions. */
+  suggestionTranscriptMaxChars: number;
+  /** Max user+assistant messages included in a chat completion request. */
+  chatMaxMessages: number;
 };
 
 export type ChatMessage = {

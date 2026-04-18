@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { defaultVoxaConfig } from "@/lib/config";
 import {
   GROQ_CHAT_COMPLETIONS_MODEL,
   groqApiKeyFromRequest,
   groqUpstreamErrorSummary,
 } from "@/lib/groqServer";
+import { dedupeConsecutiveLines } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
 
@@ -19,6 +21,11 @@ function coerceKind(kind: unknown): SuggestionKind {
 function safePreview(v: unknown): string {
   if (typeof v !== "string") return "";
   return v.trim().replaceAll(/\s+/g, " ").slice(0, 140);
+}
+
+function clampInt(n: unknown, min: number, max: number, fallback: number): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
 }
 
 export async function POST(req: Request) {
@@ -40,37 +47,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Expected JSON body" }, { status: 400 });
   }
 
-  const { transcript, prompt } = (body ?? {}) as {
+  const { transcript, prompt, maxTranscriptChars } = (body ?? {}) as {
     transcript?: unknown;
     prompt?: unknown;
+    maxTranscriptChars?: unknown;
   };
 
   if (typeof transcript !== "string") {
     return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
   }
 
-  const transcriptTrimmed = transcript.trim().slice(0, 2000);
+  const cap = clampInt(
+    maxTranscriptChars,
+    400,
+    8000,
+    defaultVoxaConfig.suggestionTranscriptMaxChars,
+  );
+  const transcriptTrimmed = dedupeConsecutiveLines(transcript.trim()).slice(-cap);
   if (!transcriptTrimmed) {
     return NextResponse.json({ suggestions: [] }, { status: 200 });
   }
 
   const suggestionPrompt =
     typeof prompt === "string" && prompt.trim()
-      ? prompt.trim()
-      : "Generate exactly 3 concise, high-value standalone suggestions to help the user proceed.";
+      ? prompt.trim().slice(0, 1500)
+      : "3 concise standalone suggestions to proceed.";
 
   const system = [
-    "You generate suggestions for a live workspace.",
-    "Return ONLY valid JSON with this exact shape:",
-    '{ "suggestions": [ { "kind": "question|answer|clarification|fact-check", "preview": "..." }, ... ] }',
-    "Rules:",
-    "- suggestions length MUST be exactly 3",
-    "- preview MUST be short (<= 140 chars), standalone, high-value",
-    "- kind MUST be one of: question, answer, clarification, fact-check",
-    "- minimize tokens; do not include explanations or extra keys",
-  ].join("\n");
+    "Output ONLY JSON: { \"suggestions\": [ { \"kind\": \"question|answer|clarification|fact-check\", \"preview\": \"...\" } ] }",
+    "Exactly 3 items. preview ≤140 chars. No extra keys.",
+  ].join(" ");
 
-  const user = `Prompt:\n${suggestionPrompt}\n\nRecent transcript:\n${transcriptTrimmed}`;
+  const user = `Task: ${suggestionPrompt}\nTranscript:\n${transcriptTrimmed}`;
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -81,7 +89,7 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       model: GROQ_CHAT_COMPLETIONS_MODEL,
       temperature: 0.2,
-      max_tokens: 220,
+      max_tokens: 200,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
@@ -127,7 +135,6 @@ export async function POST(req: Request) {
     // fall through to strict fallback
   }
 
-  // Strict fallback: always exactly 3, minimal + safe.
   return NextResponse.json({
     suggestions: [
       { kind: "clarification", preview: "What’s the desired outcome of this discussion?" },
@@ -136,4 +143,3 @@ export async function POST(req: Request) {
     ],
   });
 }
-

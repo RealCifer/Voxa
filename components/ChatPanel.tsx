@@ -6,7 +6,7 @@ import { requestChatCompletion } from "@/lib/chatClient";
 import { loadVoxaConfig } from "@/lib/config";
 import { getGroqApiKey } from "@/lib/groqClient";
 import { useAppStore } from "@/lib/store/app-store";
-import { CHAT_TRANSCRIPT_MAX_CHARS, formatTranscriptTail } from "@/lib/transcriptFormat";
+import { formatTranscriptForLlm } from "@/lib/transcriptFormat";
 
 export function ChatPanel() {
   const chat = useAppStore((s) => s.chat);
@@ -18,8 +18,13 @@ export function ChatPanel() {
 
   const config = useMemo(() => loadVoxaConfig(), []);
   const transcriptForChat = useMemo(
-    () => formatTranscriptTail(transcript, config.chatContextWindow, CHAT_TRANSCRIPT_MAX_CHARS),
-    [config.chatContextWindow, transcript],
+    () =>
+      formatTranscriptForLlm(
+        transcript,
+        config.chatContextWindow,
+        config.chatTranscriptMaxChars,
+      ),
+    [config.chatContextWindow, config.chatTranscriptMaxChars, transcript],
   );
 
   async function onSubmit(e: { preventDefault(): void }) {
@@ -57,6 +62,8 @@ export function ChatPanel() {
         messages,
         chatPrompt: config.chatPrompt,
         detailPrompt: config.detailPrompt,
+        chatHistoryLimit: config.chatMaxMessages,
+        transcriptMaxChars: config.chatTranscriptMaxChars,
       });
 
       if ("error" in result) {
@@ -98,11 +105,32 @@ export function ChatPanel() {
               </div>
             ))
           )}
+          {isSending ? (
+            <div
+              className="rounded border border-dashed border-neutral-300 px-2 py-2 text-sm text-neutral-500 dark:border-neutral-600 dark:text-neutral-400"
+              aria-live="polite"
+            >
+              <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                Assistant
+              </span>
+              <p className="mt-1 animate-pulse">Replying…</p>
+            </div>
+          ) : null}
         </div>
         {sendError ? (
-          <p className="shrink-0 text-xs text-red-600 dark:text-red-400" role="alert">
-            {sendError}
-          </p>
+          <div
+            className="flex shrink-0 items-start justify-between gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/50 dark:bg-red-950/40"
+            role="alert"
+          >
+            <p className="min-w-0 flex-1 text-xs text-red-800 dark:text-red-200">{sendError}</p>
+            <button
+              type="button"
+              onClick={() => setSendError(null)}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-red-800 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/50"
+            >
+              Dismiss
+            </button>
+          </div>
         ) : null}
         <form
           onSubmit={(e) => void onSubmit(e)}

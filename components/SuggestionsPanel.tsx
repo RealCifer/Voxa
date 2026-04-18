@@ -6,7 +6,7 @@ import { requestChatCompletion } from "@/lib/chatClient";
 import { loadVoxaConfig } from "@/lib/config";
 import { getGroqApiKey } from "@/lib/groqClient";
 import { useAppStore } from "@/lib/store/app-store";
-import { CHAT_TRANSCRIPT_MAX_CHARS, formatFullTranscript } from "@/lib/transcriptFormat";
+import { formatTranscriptForLlm } from "@/lib/transcriptFormat";
 import type { Suggestion } from "@/types";
 
 const AUTO_REFRESH_MS = 30_000;
@@ -19,16 +19,20 @@ export function SuggestionsPanel() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandingId, setExpandingId] = useState<string | null>(null);
   const [suggestionChatError, setSuggestionChatError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const lastHashRef = useRef<string>("");
 
   const config = useMemo(() => loadVoxaConfig(), []);
 
-  const recentTranscript = useMemo(() => {
-    const n = Math.max(1, config.suggestionContextWindow);
-    const slice = transcript.slice(-n).map((s) => s.text.trim()).filter(Boolean);
-    const joined = slice.join("\n");
-    return joined.length > 2000 ? joined.slice(-2000) : joined;
-  }, [config.suggestionContextWindow, transcript]);
+  const recentTranscript = useMemo(
+    () =>
+      formatTranscriptForLlm(
+        transcript,
+        config.suggestionContextWindow,
+        config.suggestionTranscriptMaxChars,
+      ),
+    [config.suggestionContextWindow, config.suggestionTranscriptMaxChars, transcript],
+  );
 
   async function refreshOnce() {
     if (!recentTranscript) return;
@@ -37,6 +41,7 @@ export function SuggestionsPanel() {
     lastHashRef.current = hash;
 
     setIsRefreshing(true);
+    setRefreshError(null);
     try {
       const apiKey = getGroqApiKey();
       const res = await fetch("/api/suggest", {
@@ -48,18 +53,33 @@ export function SuggestionsPanel() {
         body: JSON.stringify({
           transcript: recentTranscript,
           prompt: config.suggestionPrompt,
+          maxTranscriptChars: config.suggestionTranscriptMaxChars,
         }),
       });
 
-      const json = (await res.json()) as {
-        suggestions?: Array<{ kind?: string; preview?: string }>;
-        error?: string;
-      };
+      const raw = await res.text();
+      let json: { suggestions?: unknown; error?: string } = {};
+      try {
+        json = JSON.parse(raw) as { suggestions?: unknown; error?: string };
+      } catch {
+        json = {};
+      }
 
-      if (!res.ok) throw new Error(json.error ?? "Suggestion request failed");
+      if (!res.ok) {
+        setRefreshError(
+          typeof json.error === "string"
+            ? json.error
+            : `Suggestions failed (${res.status}). Check your API key and try Refresh.`,
+        );
+        return;
+      }
 
       const suggestions = Array.isArray(json.suggestions) ? json.suggestions : [];
-      if (suggestions.length !== 3) throw new Error("Suggestions must be exactly 3");
+      if (suggestions.length === 0) return;
+      if (suggestions.length !== 3) {
+        setRefreshError("Suggestions response was invalid. Try Refresh again.");
+        return;
+      }
 
       const items = suggestions.map((s) => ({
         id: crypto.randomUUID(),
@@ -71,6 +91,9 @@ export function SuggestionsPanel() {
       prependBatch(items as never);
     } catch (e) {
       console.error("[suggestions error]", e);
+      setRefreshError(
+        e instanceof Error ? e.message : "Could not refresh suggestions. Check your connection.",
+      );
     } finally {
       setIsRefreshing(false);
     }
@@ -85,8 +108,12 @@ export function SuggestionsPanel() {
       return;
     }
 
-    const fullTranscript = formatFullTranscript(transcript).slice(-CHAT_TRANSCRIPT_MAX_CHARS);
-    if (!fullTranscript.trim()) {
+    const transcriptForDetail = formatTranscriptForLlm(
+      transcript,
+      config.chatContextWindow,
+      config.chatTranscriptMaxChars,
+    );
+    if (!transcriptForDetail.trim()) {
       setSuggestionChatError("Transcript is empty. Start recording so there is context to use.");
       return;
     }
@@ -112,11 +139,13 @@ export function SuggestionsPanel() {
 
       const result = await requestChatCompletion({
         apiKey,
-        transcript: fullTranscript,
+        transcript: transcriptForDetail,
         messages,
         chatPrompt: config.chatPrompt,
         detailPrompt: config.detailPrompt,
         suggestion: { kind: s.kind, preview: s.preview },
+        chatHistoryLimit: config.chatMaxMessages,
+        transcriptMaxChars: config.chatTranscriptMaxChars,
       });
 
       if ("error" in result) {
@@ -159,10 +188,37 @@ export function SuggestionsPanel() {
       }
     >
       <div className="space-y-4">
+        {refreshError ? (
+          <div
+            className="flex items-start justify-between gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/50 dark:bg-red-950/40"
+            role="alert"
+          >
+            <p className="min-w-0 flex-1 text-xs text-red-800 dark:text-red-200">{refreshError}</p>
+            <button
+              type="button"
+              onClick={() => setRefreshError(null)}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-red-800 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/50"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
         {suggestionChatError ? (
-          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {suggestionChatError}
-          </p>
+          <div
+            className="flex items-start justify-between gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/50 dark:bg-red-950/40"
+            role="alert"
+          >
+            <p className="min-w-0 flex-1 text-xs text-red-800 dark:text-red-200">
+              {suggestionChatError}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSuggestionChatError(null)}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-red-800 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/50"
+            >
+              Dismiss
+            </button>
+          </div>
         ) : null}
         {batches.map((b) => (
           <section key={b.id} className="space-y-2">
@@ -174,7 +230,7 @@ export function SuggestionsPanel() {
                 <button
                   key={s.id}
                   type="button"
-                  title="Send to chat with full transcript context"
+                  title="Send to chat with transcript context (last N segments)"
                   disabled={expandingId !== null}
                   onClick={() => void onSuggestionActivate(s)}
                   className="w-full rounded border border-neutral-200 bg-white p-2.5 text-left transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900/80"
