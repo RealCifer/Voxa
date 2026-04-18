@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRealtimeSession } from "@/hooks/useRealtimeSession";
+import { buildSessionExport, downloadSessionJson } from "@/lib/sessionExport";
 import { useAppStore } from "@/lib/store/app-store";
 
 const sessionBadge: Record<string, string> = {
@@ -16,6 +17,17 @@ export function AppHeader() {
   const sessionLabel = useAppStore((s) => s.sessionLabel);
   const { state } = useRealtimeSession();
 
+  function onExportSession() {
+    const { transcript, suggestionBatches, chat, sessionLabel: label } = useAppStore.getState();
+    const payload = buildSessionExport({
+      sessionLabel: label,
+      transcript,
+      suggestionBatches,
+      chat,
+    });
+    downloadSessionJson(payload);
+  }
+
   return (
     <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
       <div className="min-w-0">
@@ -25,6 +37,13 @@ export function AppHeader() {
         <p className="truncate text-xs text-neutral-500 dark:text-neutral-500">{sessionLabel}</p>
       </div>
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onExportSession}
+          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
+        >
+          Export Session
+        </button>
         <Link
           href="/settings"
           className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
