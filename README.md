@@ -51,7 +51,7 @@ flowchart LR
 ## Prompt strategy
 
 - **Suggestions** (`/api/suggest`): **Meeting copilot** brief in Settings (default includes `{{recent_transcript}}`). Model returns `{"suggestions":[{"type":"question|insight|clarification","text":"..."}]}` — three items, ≤20 words each, diverse types. API normalizes to `kind` + `preview` for the UI. Short system line + `json_object` mode.
-- **Chat** (`/api/chat`): Normal turns use a short system preamble + **chat prompt** + transcript excerpt. **Suggestion click**: **detail prompt** in Settings is expanded with `{{recent_transcript}}` and `{{suggestion}}` (`[kind] preview`) into the system message, with higher `max_tokens`. User/assistant history is still the `messages` array (last *K* turns).
+- **Chat** (`/api/chat`): If **chat prompt** includes `{{recent_transcript}}`, `{{chat_history}}`, or `{{user_input}}`, the server fills those (prior turns + latest user question in system; one short user line to satisfy the API). Otherwise legacy: preamble + rules + transcript, full `messages` thread. **Suggestion click**: **detail prompt** with `{{recent_transcript}}` / `{{suggestion}}`, full message thread, higher `max_tokens`.
 - **Grounding**: Transcript is always an excerpt, never the full session unless it fits under caps — trades perfect recall for cost and latency.
 
 ## Tradeoffs

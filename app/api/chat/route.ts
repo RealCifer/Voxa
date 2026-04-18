@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { defaultVoxaConfig } from "@/lib/config";
-import {
-  GROQ_CHAT_COMPLETIONS_MODEL,
-  groqApiKeyFromRequest,
-  groqUpstreamErrorSummary,
-} from "@/lib/groqServer";
+import { GroqFetchError, groqFetch } from "@/lib/groqClient";
+import { GROQ_CHAT_COMPLETIONS_MODEL, groqApiKeyFromRequest } from "@/lib/groqServer";
 import { dedupeConsecutiveLines, LLM_TRANSCRIPT_HARD_CAP } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
@@ -19,6 +16,8 @@ const DEFAULT_TRANSCRIPT_CAP = defaultVoxaConfig.chatTranscriptMaxChars;
 
 const PLACEHOLDER_TRANSCRIPT = "{{recent_transcript}}";
 const PLACEHOLDER_SUGGESTION = "{{suggestion}}";
+const PLACEHOLDER_CHAT_HISTORY = "{{chat_history}}";
+const PLACEHOLDER_USER_INPUT = "{{user_input}}";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -57,13 +56,57 @@ function coerceSuggestion(raw: unknown): SuggestionPayload | undefined {
   return undefined;
 }
 
+function usesChatPlaceholders(template: string): boolean {
+  return (
+    template.includes(PLACEHOLDER_TRANSCRIPT) ||
+    template.includes(PLACEHOLDER_CHAT_HISTORY) ||
+    template.includes(PLACEHOLDER_USER_INPUT)
+  );
+}
+
+function formatChatHistoryLines(priorTurns: Turn[]): string {
+  if (priorTurns.length === 0) return "(No prior messages.)";
+  return priorTurns
+    .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
+    .join("\n\n");
+}
+
+/**
+ * Packs transcript, prior turns, and latest user text into the system message; one short user turn for the API.
+ */
+function buildTemplatedNormalChat(
+  template: string,
+  transcriptBlock: string,
+  trimmedMessages: Turn[],
+): { system: string; completionMessages: Turn[] } {
+  const last = trimmedMessages.at(-1);
+  let userInput = "";
+  let prior = trimmedMessages;
+
+  if (last?.role === "user") {
+    userInput = last.content;
+    prior = trimmedMessages.slice(0, -1);
+  }
+
+  const chatHistory = formatChatHistoryLines(prior);
+  const system = template
+    .replaceAll(PLACEHOLDER_TRANSCRIPT, transcriptBlock)
+    .replaceAll(PLACEHOLDER_CHAT_HISTORY, chatHistory)
+    .replaceAll(PLACEHOLDER_USER_INPUT, userInput || "(None)")
+    .slice(0, 24_000);
+
+  return {
+    system,
+    completionMessages: [{ role: "user", content: "Respond following the system instructions." }],
+  };
+}
+
 function buildNormalSystem(chatPrompt: string, transcriptBlock: string): string {
   const head =
     "Transcript assistant. Markdown prose. Use TRANSCRIPT when relevant; do not paste it wholesale.";
   return [head, `Rules: ${chatPrompt}`, `TRANSCRIPT:\n${transcriptBlock}`].join("\n\n");
 }
 
-/** Filled template (placeholders) or legacy stacked instructions if the prompt has no placeholders. */
 function buildSuggestionSystem(
   detailPrompt: string,
   chatPrompt: string,
@@ -143,7 +186,7 @@ export async function POST(req: Request) {
 
   const chatPrompt =
     typeof b.chatPrompt === "string" && b.chatPrompt.trim()
-      ? b.chatPrompt.trim().slice(0, 4000)
+      ? b.chatPrompt.trim().slice(0, 12_000)
       : defaultVoxaConfig.chatPrompt;
 
   const detailPrompt =
@@ -152,50 +195,49 @@ export async function POST(req: Request) {
       : defaultVoxaConfig.detailPrompt;
 
   const suggestion = coerceSuggestion(b.suggestion);
-  const system = suggestion
-    ? buildSuggestionSystem(detailPrompt, chatPrompt, transcriptBlock, suggestion)
-    : buildNormalSystem(chatPrompt, transcriptBlock);
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: GROQ_CHAT_COMPLETIONS_MODEL,
-      temperature: 0.35,
-      max_tokens: suggestion ? MAX_OUTPUT_TOKENS_DETAIL : MAX_OUTPUT_TOKENS_CHAT,
-      messages: [{ role: "system", content: system }, ...trimmedMessages],
-    }),
-  });
+  let system: string;
+  let completionMessages: Turn[] = trimmedMessages;
 
-  const raw = await res.text();
-  if (!res.ok) {
-    const summary = groqUpstreamErrorSummary(res.status, raw);
-    return NextResponse.json(
-      {
-        error: `Groq chat failed: ${summary}`,
-        status: res.status,
-        details: raw,
-      },
-      { status: 502 },
-    );
+  if (suggestion) {
+    system = buildSuggestionSystem(detailPrompt, chatPrompt, transcriptBlock, suggestion);
+  } else if (usesChatPlaceholders(chatPrompt)) {
+    const built = buildTemplatedNormalChat(chatPrompt, transcriptBlock, trimmedMessages);
+    system = built.system;
+    completionMessages = built.completionMessages;
+  } else {
+    system = buildNormalSystem(chatPrompt, transcriptBlock);
   }
 
   try {
-    const json = JSON.parse(raw) as {
+    const json = await groqFetch<{
       choices?: Array<{ message?: { content?: string } }>;
-    };
+    }>({
+      endpoint: "/chat/completions",
+      apiKey,
+      body: {
+        model: GROQ_CHAT_COMPLETIONS_MODEL,
+        temperature: 0.35,
+        max_tokens: suggestion ? MAX_OUTPUT_TOKENS_DETAIL : MAX_OUTPUT_TOKENS_CHAT,
+        messages: [{ role: "system", content: system }, ...completionMessages],
+      },
+    });
     const content = (json.choices?.[0]?.message?.content ?? "").trim();
     if (!content) {
       return NextResponse.json({ error: "Empty model response" }, { status: 502 });
     }
     return NextResponse.json({ content });
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid upstream JSON", details: raw },
-      { status: 502 },
-    );
+  } catch (e) {
+    if (e instanceof GroqFetchError) {
+      return NextResponse.json(
+        {
+          error: `Groq chat failed: ${e.message}`,
+          status: e.status,
+          details: e.rawBody,
+        },
+        { status: 502 },
+      );
+    }
+    throw e;
   }
 }

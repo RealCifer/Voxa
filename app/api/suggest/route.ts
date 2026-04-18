@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { defaultVoxaConfig } from "@/lib/config";
-import {
-  GROQ_CHAT_COMPLETIONS_MODEL,
-  groqApiKeyFromRequest,
-  groqUpstreamErrorSummary,
-} from "@/lib/groqServer";
+import { GroqFetchError, groqFetch } from "@/lib/groqClient";
+import { GROQ_CHAT_COMPLETIONS_MODEL, groqApiKeyFromRequest } from "@/lib/groqServer";
 import { dedupeConsecutiveLines } from "@/lib/transcriptFormat";
 
 export const runtime = "nodejs";
@@ -108,41 +105,37 @@ export async function POST(req: Request) {
     "Exactly one question, one insight, one clarification. Each text ≤20 words. No prose, no extra keys.",
   ].join(" ");
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: GROQ_CHAT_COMPLETIONS_MODEL,
-      temperature: 0.25,
-      max_tokens: 320,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userContent },
-      ],
-    }),
-  });
-
-  const raw = await res.text();
-  if (!res.ok) {
-    const summary = groqUpstreamErrorSummary(res.status, raw);
-    return NextResponse.json(
-      {
-        error: `Groq suggestions failed: ${summary}`,
-        status: res.status,
-        details: raw,
+  let json: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    json = await groqFetch({
+      endpoint: "/chat/completions",
+      apiKey,
+      body: {
+        model: GROQ_CHAT_COMPLETIONS_MODEL,
+        temperature: 0.25,
+        max_tokens: 320,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
       },
-      { status: 502 },
-    );
+    });
+  } catch (e) {
+    if (e instanceof GroqFetchError) {
+      return NextResponse.json(
+        {
+          error: `Groq suggestions failed: ${e.message}`,
+          status: e.status,
+          details: e.rawBody,
+        },
+        { status: 502 },
+      );
+    }
+    throw e;
   }
 
   try {
-    const json = JSON.parse(raw) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
     const content = json.choices?.[0]?.message?.content ?? "";
     const parsed = JSON.parse(content) as unknown;
     const arr = extractRawList(parsed);

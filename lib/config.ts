@@ -46,10 +46,22 @@ If applicable, include:
 - examples
 - next steps`;
 
+const defaultChatPrompt = `You are a real-time conversation assistant.
+CONTEXT:
+{{recent_transcript}}
+CHAT HISTORY:
+{{chat_history}}
+USER QUESTION:
+{{user_input}}
+RULES:
+- Answer clearly and directly
+- Use conversation context when relevant
+- Keep response concise
+- Avoid unnecessary detail`;
+
 export const defaultVoxaConfig: VoxaConfig = {
   suggestionPrompt: defaultSuggestionPrompt,
-  chatPrompt:
-    "Answer clearly and concretely. Use brief bullets when helpful. Ask clarifying questions only if needed.",
+  chatPrompt: defaultChatPrompt,
   detailPrompt: defaultDetailPrompt,
   suggestionContextWindow: 10,
   chatContextWindow: 16,

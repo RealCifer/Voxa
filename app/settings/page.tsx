@@ -192,12 +192,20 @@ export default function SettingsPage() {
           </label>
 
           <label className="space-y-1">
-            <div className="text-xs text-neutral-600 dark:text-neutral-400">Chat prompt</div>
+            <div className="text-xs text-neutral-600 dark:text-neutral-400">Chat assistant prompt</div>
             <textarea
-              className="min-h-[7rem] w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+              className="min-h-[14rem] w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
               value={config.chatPrompt}
               onChange={(e) => setConfig((c) => ({ ...c, chatPrompt: e.target.value }))}
+              spellCheck={false}
             />
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Optional placeholders:{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">{"{{recent_transcript}}"}</code>,{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">{"{{chat_history}}"}</code> (prior user/assistant turns),{" "}
+              <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-900">{"{{user_input}}"}</code> (latest user
+              message). If none are used, the app uses a compact legacy system prompt and sends the full message list.
+            </p>
           </label>
 
           <label className="space-y-1">

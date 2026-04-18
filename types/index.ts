@@ -29,6 +29,7 @@ export type AudioChunk = {
 
 export type VoxaConfig = {
   suggestionPrompt: string;
+  /** Normal chat: supports {{recent_transcript}}, {{chat_history}}, {{user_input}}; otherwise legacy short rules + transcript. */
   chatPrompt: string;
   /** System instructions when a suggestion card is opened; supports {{recent_transcript}} and {{suggestion}}. */
   detailPrompt: string;
