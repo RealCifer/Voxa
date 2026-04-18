@@ -18,6 +18,14 @@ export type SuggestionBatch = {
   items: [Suggestion, Suggestion, Suggestion];
 };
 
+export type AudioChunk = {
+  id: string;
+  createdAt: string;
+  mimeType: string;
+  sizeBytes: number;
+  blob: Blob;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";

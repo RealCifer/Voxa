@@ -1,15 +1,18 @@
 import { create } from "zustand";
-import type { ChatMessage, Suggestion, SuggestionBatch, TranscriptSegment } from "@/types";
+import type { AudioChunk, ChatMessage, Suggestion, SuggestionBatch, TranscriptSegment } from "@/types";
 
 type AppStore = {
   transcript: TranscriptSegment[];
   suggestionBatches: SuggestionBatch[];
+  audioChunks: AudioChunk[];
   chat: ChatMessage[];
   sessionLabel: string;
   isMicActive: boolean;
   setSessionLabel: (label: string) => void;
-  toggleMic: () => void;
+  setMicActive: (active: boolean) => void;
   appendTranscript: (segment: TranscriptSegment) => void;
+  pushAudioChunk: (chunk: AudioChunk) => void;
+  clearAudioChunks: () => void;
   refreshSuggestions: () => void;
   pushChat: (message: ChatMessage) => void;
   resetWorkspace: () => void;
@@ -65,15 +68,24 @@ function makeBatch(): SuggestionBatch {
 export const useAppStore = create<AppStore>((set) => ({
   transcript: [],
   suggestionBatches: seedSuggestionBatches,
+  audioChunks: [],
   chat: [],
   sessionLabel: "Session",
   isMicActive: false,
   setSessionLabel: (label) => set({ sessionLabel: label }),
-  toggleMic: () => set((s) => ({ isMicActive: !s.isMicActive })),
+  setMicActive: (active) => set({ isMicActive: active }),
   appendTranscript: (segment) =>
     set((s) => ({ transcript: [...s.transcript, segment] })),
+  pushAudioChunk: (chunk) => set((s) => ({ audioChunks: [...s.audioChunks, chunk] })),
+  clearAudioChunks: () => set({ audioChunks: [] }),
   refreshSuggestions: () => set((s) => ({ suggestionBatches: [makeBatch(), ...s.suggestionBatches] })),
   pushChat: (message) => set((s) => ({ chat: [...s.chat, message] })),
   resetWorkspace: () =>
-    set({ transcript: [], suggestionBatches: seedSuggestionBatches, chat: [], isMicActive: false }),
+    set({
+      transcript: [],
+      suggestionBatches: seedSuggestionBatches,
+      audioChunks: [],
+      chat: [],
+      isMicActive: false,
+    }),
 }));
