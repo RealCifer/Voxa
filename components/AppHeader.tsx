@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRealtimeSession } from "@/hooks/useRealtimeSession";
 import { useAppStore } from "@/lib/store/app-store";
 
@@ -23,11 +24,19 @@ export function AppHeader() {
         </h1>
         <p className="truncate text-xs text-neutral-500 dark:text-neutral-500">{sessionLabel}</p>
       </div>
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs capitalize ${sessionBadge[state] ?? sessionBadge.idle}`}
-      >
-        {state}
-      </span>
+      <div className="flex items-center gap-3">
+        <Link
+          href="/settings"
+          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
+        >
+          Settings
+        </Link>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs capitalize ${sessionBadge[state] ?? sessionBadge.idle}`}
+        >
+          {state}
+        </span>
+      </div>
     </header>
   );
 }

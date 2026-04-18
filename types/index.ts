@@ -26,6 +26,14 @@ export type AudioChunk = {
   blob: Blob;
 };
 
+export type VoxaConfig = {
+  suggestionPrompt: string;
+  chatPrompt: string;
+  detailPrompt: string;
+  suggestionContextWindow: number;
+  chatContextWindow: number;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
