@@ -6,7 +6,7 @@ export const defaultVoxaConfig: VoxaConfig = {
   suggestionPrompt:
     "You are an assistant that generates exactly 3 concise suggestions that help the user continue their work.",
   chatPrompt:
-    "You are a helpful assistant. Be concise, ask clarifying questions when needed, and propose concrete next steps.",
+    "You are a helpful assistant. Give clear, substantive answers with structure when it helps. Ask clarifying questions when needed, and propose concrete next steps.",
   detailPrompt:
     "Rewrite the selected content with more detail and clarity while preserving meaning and tone.",
   suggestionContextWindow: 12,

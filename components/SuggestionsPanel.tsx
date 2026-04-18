@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
+import { requestChatCompletion } from "@/lib/chatClient";
 import { loadVoxaConfig } from "@/lib/config";
 import { getGroqApiKey } from "@/lib/groqClient";
 import { useAppStore } from "@/lib/store/app-store";
+import { CHAT_TRANSCRIPT_MAX_CHARS, formatFullTranscript } from "@/lib/transcriptFormat";
+import type { Suggestion } from "@/types";
 
 const AUTO_REFRESH_MS = 30_000;
 
@@ -12,7 +15,10 @@ export function SuggestionsPanel() {
   const batches = useAppStore((s) => s.suggestionBatches);
   const transcript = useAppStore((s) => s.transcript);
   const prependBatch = useAppStore((s) => s.prependSuggestionBatch);
+  const pushChat = useAppStore((s) => s.pushChat);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [expandingId, setExpandingId] = useState<string | null>(null);
+  const [suggestionChatError, setSuggestionChatError] = useState<string | null>(null);
   const lastHashRef = useRef<string>("");
 
   const config = useMemo(() => loadVoxaConfig(), []);
@@ -70,6 +76,65 @@ export function SuggestionsPanel() {
     }
   }
 
+  async function onSuggestionActivate(s: Suggestion) {
+    if (expandingId) return;
+
+    const apiKey = getGroqApiKey()?.trim() ?? "";
+    if (!apiKey) {
+      setSuggestionChatError("Add your Groq API key in Settings to use chat from suggestions.");
+      return;
+    }
+
+    const fullTranscript = formatFullTranscript(transcript).slice(-CHAT_TRANSCRIPT_MAX_CHARS);
+    if (!fullTranscript.trim()) {
+      setSuggestionChatError("Transcript is empty. Start recording so there is context to use.");
+      return;
+    }
+
+    setSuggestionChatError(null);
+    setExpandingId(s.id);
+
+    const userLine = `Selected suggestion (${s.kind}): ${s.preview}`;
+    pushChat({
+      id: crypto.randomUUID(),
+      role: "user",
+      content: userLine,
+      createdAt: new Date().toISOString(),
+    });
+
+    try {
+      const history = useAppStore.getState().chat;
+      const messages = history
+        .filter((m): m is { role: "user" | "assistant"; content: string; id: string; createdAt: string } =>
+          m.role === "user" || m.role === "assistant",
+        )
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const result = await requestChatCompletion({
+        apiKey,
+        transcript: fullTranscript,
+        messages,
+        chatPrompt: config.chatPrompt,
+        detailPrompt: config.detailPrompt,
+        suggestion: { kind: s.kind, preview: s.preview },
+      });
+
+      if ("error" in result) {
+        setSuggestionChatError(result.error);
+        return;
+      }
+
+      pushChat({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: result.content,
+        createdAt: new Date().toISOString(),
+      });
+    } finally {
+      setExpandingId(null);
+    }
+  }
+
   useEffect(() => {
     if (!recentTranscript) return;
     const id = globalThis.setInterval(() => {
@@ -94,6 +159,11 @@ export function SuggestionsPanel() {
       }
     >
       <div className="space-y-4">
+        {suggestionChatError ? (
+          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+            {suggestionChatError}
+          </p>
+        ) : null}
         {batches.map((b) => (
           <section key={b.id} className="space-y-2">
             <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
@@ -101,19 +171,23 @@ export function SuggestionsPanel() {
             </div>
             <div className="grid grid-cols-1 gap-2">
               {b.items.map((s) => (
-                <article
+                <button
                   key={s.id}
-                  className="rounded border border-neutral-200 bg-white p-2.5 dark:border-neutral-800 dark:bg-neutral-950"
+                  type="button"
+                  title="Send to chat with full transcript context"
+                  disabled={expandingId !== null}
+                  onClick={() => void onSuggestionActivate(s)}
+                  className="w-full rounded border border-neutral-200 bg-white p-2.5 text-left transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900/80"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="min-w-0 flex-1 text-sm text-neutral-800 dark:text-neutral-200">
-                      {s.preview}
+                      {expandingId === s.id ? "Opening in chat…" : s.preview}
                     </p>
                     <span className="shrink-0 rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
                       {s.kind}
                     </span>
                   </div>
-                </article>
+                </button>
               ))}
             </div>
           </section>
