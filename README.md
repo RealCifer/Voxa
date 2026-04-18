@@ -31,7 +31,7 @@ Browser workspace for **live microphone capture**, **Groq Whisper transcription*
 |--------|------|
 | **UI** | `AppShell` — three columns: `TranscriptPanel`, `SuggestionsPanel`, `ChatPanel`; `AppHeader` for export and mic status. |
 | **State** | `lib/store/app-store.ts` — transcript segments, suggestion batches, chat messages, mic flag, session label. |
-| **API routes** | `app/api/transcribe` — Whisper; `app/api/suggest` — suggestions (Settings prompt); `app/api/suggestions` — live suggestions (`transcript` + `apiKey` JSON, capped transcript); `app/api/chat` — completions. Model id in `lib/groqServer.ts`. |
+| **API routes** | `app/api/transcribe` — Whisper; `app/api/suggest` / `app/api/suggestions` — suggestions; `app/api/detail` — expanded answer for one suggestion (`transcript`, `selectedSuggestion`, `apiKey`); `app/api/chat` — completions. Model id in `lib/groqServer.ts`. |
 | **LLM context** | `lib/transcriptFormat.ts` — last *N* segments, join, **dedupe consecutive lines**, character cap; shared by client build of payload and server-side clamp/dedupe. |
 | **Config** | `lib/config.ts` + Settings UI — context windows, char caps, chat history limit, prompts (persisted in `localStorage`). |
 | **Export** | `lib/sessionExport.ts` — JSON download of transcript, batches, chat (with timestamps / offsets). |
