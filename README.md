@@ -247,6 +247,6 @@ Export format: JSON
 
 ---
 
-## Conclusion
+## Maker
 
-Voxa is designed as a real-time, context-aware assistant that balances usability, performance, and intelligent prompting. The system demonstrates practical application of LLMs in live environments with careful attention to latency, token efficiency, and structured outputs.
+Aditya Khamait - adityadkhamait@gmail.com
