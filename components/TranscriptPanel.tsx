@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { useAppStore } from "@/lib/store/app-store";
 import { getGroqApiKey } from "@/lib/groqClient";
 
@@ -20,6 +21,12 @@ export function TranscriptPanel() {
   const streamRef = useRef<MediaStream | null>(null);
   const chunkIndexRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const transcribeInFlightCountRef = useRef(0);
+  const lastChunkIdRef = useRef<string>("");
+  let statusLabel = "idle";
+  if (isTranscribing) statusLabel = "transcribing…";
+  else if (isMicActive) statusLabel = "listening";
 
   async function startRecording() {
     setError(null);
@@ -52,6 +59,12 @@ export function TranscriptPanel() {
         pushAudioChunk(chunk);
 
         try {
+          if (lastChunkIdRef.current === chunk.id) return;
+          lastChunkIdRef.current = chunk.id;
+
+          transcribeInFlightCountRef.current += 1;
+          setIsTranscribing(true);
+
           const filename = `chunk-${chunkIndexRef.current}.webm`;
           const file = new File([chunk.blob], filename, { type: chunk.mimeType });
           const body = new FormData();
@@ -63,10 +76,11 @@ export function TranscriptPanel() {
             return;
           }
           body.set("groqApiKey", apiKey);
-          const res = await fetch("/api/transcribe", {
+          const res = await fetchWithTimeout("/api/transcribe", {
             method: "POST",
             headers: apiKey ? { "x-api-key": apiKey } : undefined,
             body,
+            timeoutMs: 35_000,
           });
           const json = (await res.json()) as { text?: string; error?: string };
           if (!res.ok) {
@@ -87,11 +101,16 @@ export function TranscriptPanel() {
               startMs: chunkIndexRef.current * CHUNK_TIMESLICE_MS,
               isFinal: true,
             });
+          } else {
+            // Non-fatal: show a minimal fallback instead of silently doing nothing
+            setError("Transcription returned empty text. The chunk may have been silent.");
           }
         } catch (err) {
           setError(err instanceof Error ? err.message : "Transcription failed.");
         } finally {
           chunkIndexRef.current += 1;
+          transcribeInFlightCountRef.current = Math.max(0, transcribeInFlightCountRef.current - 1);
+          if (transcribeInFlightCountRef.current === 0) setIsTranscribing(false);
         }
       });
 
@@ -175,6 +194,12 @@ export function TranscriptPanel() {
             </div>
             <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
               Each chunk is about {CHUNK_TIMESLICE_MS / 1000}s of audio, then transcribed via Groq.
+            </p>
+            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+              Status:{" "}
+              <span className="font-medium">
+                {statusLabel}
+              </span>
             </p>
           </div>
 

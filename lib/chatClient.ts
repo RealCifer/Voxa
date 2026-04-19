@@ -1,4 +1,5 @@
 import { defaultVoxaConfig } from "@/lib/config";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export type ChatApiTurn = { role: "user" | "assistant"; content: string };
 
@@ -21,7 +22,7 @@ export async function requestChatCompletion(args: {
   chatHistoryLimit?: number;
   transcriptMaxChars?: number;
 }): Promise<{ content: string } | { error: string }> {
-  const res = await fetch("/api/chat", {
+  const res = await fetchWithTimeout("/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -36,6 +37,7 @@ export async function requestChatCompletion(args: {
       chatHistoryLimit: args.chatHistoryLimit ?? defaultVoxaConfig.chatMaxMessages,
       transcriptMaxChars: args.transcriptMaxChars ?? defaultVoxaConfig.chatTranscriptMaxChars,
     }),
+    timeoutMs: 25_000,
   });
 
   const raw = await res.text();

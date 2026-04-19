@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
 import { requestChatCompletion } from "@/lib/chatClient";
 import { loadVoxaConfig } from "@/lib/config";
@@ -15,6 +15,7 @@ export function ChatPanel() {
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   const config = useMemo(() => loadVoxaConfig(), []);
   const transcriptForChat = useMemo(
@@ -30,7 +31,7 @@ export function ChatPanel() {
   async function onSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || isSending) return;
+    if (!text || isSending || inFlightRef.current) return;
 
     const apiKey = getGroqApiKey()?.trim() ?? "";
     if (!apiKey) {
@@ -38,6 +39,7 @@ export function ChatPanel() {
       return;
     }
 
+    inFlightRef.current = true;
     pushChat({
       id: crypto.randomUUID(),
       role: "user",
@@ -68,6 +70,12 @@ export function ChatPanel() {
 
       if ("error" in result) {
         setSendError(result.error);
+        pushChat({
+          id: crypto.randomUUID(),
+          role: "system",
+          content: `Chat request failed. ${result.error}`,
+          createdAt: new Date().toISOString(),
+        });
         return;
       }
 
@@ -79,6 +87,7 @@ export function ChatPanel() {
       });
     } finally {
       setIsSending(false);
+      inFlightRef.current = false;
     }
   }
 

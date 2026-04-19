@@ -66,7 +66,7 @@ export const defaultVoxaConfig: VoxaConfig = {
   suggestionContextWindow: 10,
   suggestionSmartSeconds: 90,
   chatContextWindow: 16,
-  chatTranscriptMaxChars: 8192,
+  chatTranscriptMaxChars: 4096,
   suggestionTranscriptMaxChars: 2048,
   chatMaxMessages: 28,
 };

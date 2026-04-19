@@ -22,18 +22,11 @@ export function SuggestionsPanel() {
   const [suggestionChatError, setSuggestionChatError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const lastHashRef = useRef<string>("");
+  const inFlightRefreshRef = useRef(false);
 
   const config = useMemo(() => loadVoxaConfig(), []);
 
-  const recentTranscript = useMemo(
-    () =>
-      formatTranscriptForLlm(
-        transcript,
-        config.suggestionContextWindow,
-        config.suggestionTranscriptMaxChars,
-      ),
-    [config.suggestionContextWindow, config.suggestionTranscriptMaxChars, transcript],
-  );
+  const lastSeg = transcript.length > 0 ? transcript.at(-1) : null;
 
   /** Timed tail for suggestion smart window (`getSmartContext`); keeps payload bounded. */
   const segmentsForSuggest = useMemo(() => {
@@ -53,11 +46,15 @@ export function SuggestionsPanel() {
   }, [config.suggestionContextWindow, transcript]);
 
   async function refreshOnce() {
-    if (!recentTranscript) return;
-    const hash = `${transcript.length}:${recentTranscript.slice(-160)}`;
+    if (inFlightRefreshRef.current) return;
+    if (transcript.length === 0) return;
+
+    const tailHint = (lastSeg?.text ?? "").slice(-96);
+    const hash = `${transcript.length}:${lastSeg?.id ?? ""}:${tailHint}`;
     if (hash === lastHashRef.current) return;
     lastHashRef.current = hash;
 
+    inFlightRefreshRef.current = true;
     setIsRefreshing(true);
     setRefreshError(null);
     try {
@@ -82,6 +79,7 @@ export function SuggestionsPanel() {
       );
     } finally {
       setIsRefreshing(false);
+      inFlightRefreshRef.current = false;
     }
   }
 
@@ -97,7 +95,7 @@ export function SuggestionsPanel() {
     const transcriptForDetail = formatTranscriptForLlm(
       transcript,
       config.chatContextWindow,
-      config.chatTranscriptMaxChars,
+      Math.min(4096, config.chatTranscriptMaxChars),
     );
     if (!transcriptForDetail.trim()) {
       setSuggestionChatError("Transcript is empty. Start recording so there is context to use.");
@@ -124,6 +122,12 @@ export function SuggestionsPanel() {
 
       if ("error" in result) {
         setSuggestionChatError(result.error);
+        pushChat({
+          id: crypto.randomUUID(),
+          role: "system",
+          content: `Couldn’t expand that suggestion. ${result.error}`,
+          createdAt: new Date().toISOString(),
+        });
         return;
       }
 
@@ -139,13 +143,13 @@ export function SuggestionsPanel() {
   }
 
   useEffect(() => {
-    if (!recentTranscript) return;
+    if (transcript.length === 0) return;
     const id = globalThis.setInterval(() => {
       void refreshOnce();
     }, AUTO_REFRESH_MS);
     return () => globalThis.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recentTranscript]);
+  }, [transcript.length, lastSeg?.id]);
 
   return (
     <Panel

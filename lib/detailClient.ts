@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+
 function parseJsonObject(text: string): Record<string, unknown> {
   if (!text.trim()) return {};
   try {
@@ -12,7 +14,7 @@ export async function requestDetail(args: {
   transcript: string;
   selectedSuggestion: { kind: string; preview: string } | string;
 }): Promise<{ answer: string } | { error: string }> {
-  const res = await fetch("/api/detail", {
+  const res = await fetchWithTimeout("/api/detail", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -22,6 +24,7 @@ export async function requestDetail(args: {
       transcript: args.transcript,
       selectedSuggestion: args.selectedSuggestion,
     }),
+    timeoutMs: 25_000,
   });
 
   const raw = await res.text();

@@ -1,4 +1,5 @@
 import type { Suggestion, TranscriptSegment } from "@/types";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 function parseJsonObject(text: string): Record<string, unknown> {
   if (!text.trim()) return {};
@@ -38,7 +39,7 @@ export async function requestSuggestions(args: {
   smartSeconds?: number;
   maxTranscriptChars?: number;
 }): Promise<{ suggestions: [Suggestion, Suggestion, Suggestion] } | { error: string }> {
-  const res = await fetch("/api/suggestions", {
+  const res = await fetchWithTimeout("/api/suggestions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -50,6 +51,7 @@ export async function requestSuggestions(args: {
       smartSeconds: args.smartSeconds,
       maxTranscriptChars: args.maxTranscriptChars,
     }),
+    timeoutMs: 20_000,
   });
 
   const raw = await res.text();
