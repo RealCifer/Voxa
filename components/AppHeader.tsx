@@ -21,32 +21,32 @@ export function AppHeader() {
   }
 
   return (
-    <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+    <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-4 border-b border-zinc-800 bg-slate-950/80 px-4 py-3 backdrop-blur md:px-6">
       <div className="min-w-0">
-        <h1 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+        <h1 className="text-sm font-semibold tracking-tight text-zinc-100">
           Voxa
         </h1>
-        <p className="truncate text-xs text-neutral-500 dark:text-neutral-500">{sessionLabel}</p>
+        <p className="truncate text-xs text-zinc-400">{sessionLabel}</p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           onClick={onExportSession}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
+          className="rounded-xl border border-zinc-700 bg-zinc-900/40 px-3 py-1.5 text-xs font-medium text-zinc-100 shadow-sm hover:bg-zinc-900/60"
         >
           Export session
         </button>
         <Link
           href="/settings"
-          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
+          className="rounded-xl border border-zinc-700 bg-zinc-900/40 px-3 py-1.5 text-xs font-medium text-zinc-100 shadow-sm hover:bg-zinc-900/60"
         >
           Settings
         </Link>
         <span
           className={`rounded-full px-2 py-0.5 text-xs ${
             isMicActive
-              ? "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100"
-              : "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              ? "border border-red-900/60 bg-red-950/40 text-red-100"
+              : "border border-zinc-700 bg-zinc-900/40 text-zinc-300"
           }`}
           title={isMicActive ? "Microphone is on" : "Microphone is off"}
         >

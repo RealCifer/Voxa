@@ -7,13 +7,15 @@ import { TranscriptPanel } from "@/components/TranscriptPanel";
 
 export function AppShell() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-0">
+    <div className="flex min-h-0 flex-1 flex-col">
       <AppHeader />
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-neutral-200 md:grid-cols-3 dark:bg-neutral-800">
-        <TranscriptPanel />
-        <SuggestionsPanel />
-        <ChatPanel />
-      </div>
+      <main className="min-h-0 flex-1 px-4 py-4 md:px-6 md:py-6">
+        <div className="grid min-h-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <TranscriptPanel />
+          <SuggestionsPanel />
+          <ChatPanel />
+        </div>
+      </main>
     </div>
   );
 }
