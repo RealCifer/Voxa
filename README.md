@@ -78,28 +78,54 @@ The system is divided into three primary layers:
 ## Project Structure
 
 ```
-/app
-  /api
-    /transcribe
-    /suggestions
-    /detail
-  /components
-    TranscriptPanel.tsx
-    SuggestionsPanel.tsx
-    ChatPanel.tsx
-  /settings
-  /page.tsx
-
-/lib
-  groqClient.ts
-  contextWindow.ts
-
-/hooks
-
-/store
-  useStore.ts
-
-/types
+voxa/
+├── app/
+│   ├── api/
+│   │   ├── transcribe/
+│   │   │   └── route.ts
+│   │   ├── suggestions/
+│   │   │   └── route.ts
+│   │   └── detail/
+│   │       └── route.ts
+│   │
+│   ├── components/
+│   │   ├── TranscriptPanel.tsx
+│   │   ├── SuggestionsPanel.tsx
+│   │   ├── ChatPanel.tsx
+│   │   └── MicButton.tsx
+│   │
+│   ├── settings/
+│   │   └── page.tsx
+│   │
+│   ├── layout.tsx
+│   └── page.tsx
+│
+├── lib/
+│   ├── groqClient.ts
+│   └── contextWindow.ts
+│
+├── hooks/
+│   ├── useAudioRecorder.ts
+│   └── useSuggestions.ts
+│
+├── store/
+│   └── useStore.ts
+│
+├── types/
+│   ├── transcript.ts
+│   ├── suggestion.ts
+│   └── chat.ts
+│
+├── public/
+│
+├── styles/
+│   └── globals.css
+│
+├── .env.local
+├── package.json
+├── tsconfig.json
+├── tailwind.config.ts
+└── README.md
 ```
 
 ---
