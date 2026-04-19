@@ -5,3 +5,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@keyframes voxa-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.voxa-fade-in {
+  animation: voxa-fade-in 180ms ease-out both;
+}
+

@@ -8,6 +8,13 @@ import { getGroqApiKey } from "@/lib/groqClient";
 
 const CHUNK_TIMESLICE_MS = 30_000; // <= 30s per requirement
 
+function formatMs(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${mm}:${String(ss).padStart(2, "0")}`;
+}
+
 export function TranscriptPanel() {
   const transcript = useAppStore((s) => s.transcript);
   const isMicActive = useAppStore((s) => s.isMicActive);
@@ -17,6 +24,7 @@ export function TranscriptPanel() {
   const audioChunks = useAppStore((s) => s.audioChunks);
   const appendTranscript = useAppStore((s) => s.appendTranscript);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunkIndexRef = useRef(0);
@@ -152,113 +160,88 @@ export function TranscriptPanel() {
   }, []);
 
   useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [transcript.length]);
 
   return (
     <Panel
       title="Transcript"
-      aside={
-        <button
-          type="button"
-          onClick={isMicActive ? stopRecording : startRecording}
-          className={`rounded border px-2 py-1 text-xs ${
-            isMicActive
-              ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
-              : "border-neutral-300 bg-white text-neutral-800 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200"
-          }`}
-          aria-label={isMicActive ? "Stop microphone" : "Start microphone"}
-        >
-          {isMicActive ? "Stop recording" : "Start recording"}
-        </button>
-      }
     >
-      <div ref={scrollerRef} className="h-full min-h-[12rem] overflow-y-auto pr-1">
-        <div className="space-y-3">
-          {error ? (
-            <p className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-              {error}
-            </p>
-          ) : null}
+      <div className="flex h-full min-h-[12rem] flex-col gap-4">
+        <div className="flex items-center justify-center">
+          <button
+            type="button"
+            onClick={isMicActive ? stopRecording : startRecording}
+            className={`group relative flex w-full max-w-md items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold shadow-sm transition ${
+              isMicActive
+                ? "border-red-700/60 bg-red-950/40 text-red-100"
+                : "border-zinc-700 bg-zinc-900/40 text-zinc-100 hover:bg-zinc-900/60"
+            }`}
+            aria-label={isMicActive ? "Stop microphone" : "Start microphone"}
+          >
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                isMicActive ? "bg-red-400 shadow-[0_0_0_4px_rgba(248,113,113,0.12)]" : "bg-zinc-400"
+              } ${isMicActive ? "animate-pulse" : ""}`}
+              aria-hidden="true"
+            />
+            <span>{isMicActive ? "Recording" : "Start recording"}</span>
+          </button>
+        </div>
 
-          <div className="rounded border border-neutral-200 p-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
-            <div className="flex items-center justify-between gap-2">
-              <span>
-                Mic: <span className="font-medium">{isMicActive ? "on" : "off"}</span>
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-700 bg-zinc-900/30 px-4 py-3 text-xs text-zinc-400">
+          <span>
+            {isMicActive ? (
+              <span className="text-zinc-100">
+                Listening<span className="animate-pulse">…</span>
               </span>
-              <span>
-                Chunks sent: <span className="font-medium">{audioChunks.length}</span>
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-              Each chunk is about {CHUNK_TIMESLICE_MS / 1000}s of audio, then transcribed via Groq.
-            </p>
-            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-              Status:{" "}
-              <span className="font-medium">
-                {statusLabel}
-              </span>
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-              Recent audio chunks
-            </div>
-            {audioChunks.length === 0 ? (
-              <p className="text-neutral-500 dark:text-neutral-500">
-                Start recording to capture audio. Chunks appear here after each slice.
-              </p>
             ) : (
-              <ul className="space-y-2">
-                {audioChunks
-                  .slice()
-                  .reverse()
-                  .map((c) => (
-                    <li
-                      key={c.id}
-                      className="rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-neutral-400">
-                          {c.createdAt.slice(11, 19)}Z
-                        </span>
-                        <span className="text-xs text-neutral-400">
-                          {(c.sizeBytes / 1024).toFixed(1)} KB
-                        </span>
-                      </div>
-                      <div className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                        {c.mimeType}
-                      </div>
-                    </li>
-                  ))}
-              </ul>
+              <span>Mic idle</span>
             )}
-          </div>
+          </span>
+          <span className="truncate">
+            Chunks: <span className="text-zinc-100">{audioChunks.length}</span> · Status:{" "}
+            <span className="text-zinc-100">{statusLabel}</span>
+          </span>
+        </div>
 
-          {transcript.length > 0 ? (
-            <div className="space-y-2">
-              <div className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                Transcript
-              </div>
-              <ul className="space-y-2">
-                {transcript.map((seg) => (
-                  <li
-                    key={seg.id}
-                    className="rounded border border-neutral-100 p-2 dark:border-neutral-800"
-                  >
-                    <span className="text-xs text-neutral-400">
-                      {seg.startMs}ms
-                      {seg.isFinal ? " · final" : ""}
-                    </span>
-                    <p className="mt-1 whitespace-pre-wrap">{seg.text}</p>
-                  </li>
-                ))}
-              </ul>
+        {error ? (
+          <div
+            className="rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-sm text-red-100"
+            role="alert"
+          >
+            {error}
+          </div>
+        ) : null}
+
+        <div
+          ref={scrollerRef}
+          className="min-h-0 flex-1 overflow-y-auto pr-1"
+        >
+          {transcript.length === 0 ? (
+            <div className="rounded-xl border border-zinc-700 bg-zinc-900/30 p-4 text-sm text-zinc-400">
+              Start recording to capture audio. Transcript entries will appear here as they’re transcribed.
             </div>
-          ) : null}
+          ) : (
+            <ul className="space-y-2">
+              {transcript.map((seg) => (
+                <li key={seg.id} className="voxa-fade-in">
+                  <div className="max-w-[92%] rounded-xl border border-zinc-700 bg-zinc-900/35 p-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-zinc-400">
+                        {formatMs(seg.startMs)}
+                        {seg.isFinal ? " · final" : ""}
+                      </span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-100">{seg.text}</p>
+                  </div>
+                </li>
+              ))}
+              <li aria-hidden="true">
+                <div ref={bottomRef} />
+              </li>
+            </ul>
+          )}
         </div>
       </div>
     </Panel>
