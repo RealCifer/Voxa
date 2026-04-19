@@ -6,7 +6,9 @@ Voxa is a real-time meeting copilot web application that listens to live audio, 
 
 ## Deployed Link
 
-voxa-chi-gules.vercel.app
+https://voxa-chi-gules.vercel.app
+
+Use your Groq API key in the settings panel to start using the app.
 
 ---
 
