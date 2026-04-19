@@ -20,7 +20,7 @@ function SendIcon() {
 function AssistantLoadingBubble() {
   return (
     <div
-      className="voxa-fade-in mr-auto max-w-[88%] rounded-2xl border border-zinc-700 bg-zinc-900/45 px-4 py-3 shadow-sm"
+      className="voxa-fade-in mr-auto max-w-[88%] rounded-2xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 shadow-md shadow-black/20 backdrop-blur-sm"
       aria-live="polite"
       aria-label="Assistant is replying"
     >
@@ -41,7 +41,7 @@ function MessageBubble({ m }: Readonly<{ m: ChatMessage }>) {
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="voxa-fade-in max-w-[88%] rounded-2xl border border-blue-500/25 bg-gradient-to-br from-blue-600 to-blue-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-opacity duration-150">
+        <div className="voxa-fade-in max-w-[88%] rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-950 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition-opacity duration-200">
           <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
         </div>
       </div>
@@ -50,7 +50,7 @@ function MessageBubble({ m }: Readonly<{ m: ChatMessage }>) {
   if (m.role === "assistant") {
     return (
       <div className="flex justify-start">
-        <div className="voxa-fade-in max-w-[88%] rounded-2xl border border-zinc-700 bg-zinc-900/45 px-4 py-2.5 text-sm text-zinc-100 shadow-sm transition-opacity duration-150">
+        <div className="voxa-fade-in max-w-[88%] rounded-2xl border border-zinc-800 bg-zinc-900/55 px-4 py-2.5 text-sm font-medium text-zinc-100 shadow-md shadow-black/20 backdrop-blur-sm transition-opacity duration-200">
           <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
         </div>
       </div>
@@ -58,7 +58,7 @@ function MessageBubble({ m }: Readonly<{ m: ChatMessage }>) {
   }
   return (
     <div className="flex justify-center px-1">
-      <div className="max-w-[92%] rounded-xl border border-zinc-700/80 bg-zinc-900/35 px-3 py-2 text-center text-xs leading-relaxed text-zinc-400 transition-opacity duration-150">
+      <div className="max-w-[92%] rounded-2xl border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-center text-xs leading-relaxed text-zinc-400 shadow-sm backdrop-blur-sm transition-opacity duration-200">
         {m.content}
       </div>
     </div>
@@ -158,7 +158,7 @@ export function ChatPanel() {
   return (
     <Panel title="Chat" bodyClassName="flex min-h-0 flex-col overflow-hidden p-0">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2 pt-4">
+        <div className="voxa-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2 pt-4 md:px-6">
           {chat.length === 0 && !isSending ? (
             <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2 px-2 text-center">
               <p className="text-sm text-zinc-400">Messages appear here.</p>
@@ -167,7 +167,7 @@ export function ChatPanel() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {chat.map((m) => (
                 <MessageBubble key={m.id} m={m} />
               ))}
@@ -179,7 +179,7 @@ export function ChatPanel() {
 
         {sendError ? (
           <div
-            className="flex shrink-0 items-start justify-between gap-2 border-t border-zinc-700/80 bg-zinc-900/30 px-4 py-2"
+            className="flex shrink-0 items-start justify-between gap-2 border-t border-zinc-800 bg-zinc-900/40 px-4 py-2 backdrop-blur-sm"
             role="alert"
           >
             <p className="min-w-0 flex-1 text-xs text-red-200">{sendError}</p>
@@ -193,10 +193,10 @@ export function ChatPanel() {
           </div>
         ) : null}
 
-        <div className="sticky bottom-0 z-10 shrink-0 border-t border-zinc-700/80 bg-zinc-800/95 px-3 pb-3 pt-3 backdrop-blur-sm">
+        <div className="sticky bottom-0 z-10 shrink-0 border-t border-zinc-800 bg-zinc-900/55 px-3 pb-3 pt-3 shadow-[0_-12px_32px_-16px_rgba(0,0,0,0.45)] backdrop-blur-xl md:px-4">
           <form onSubmit={(e) => void onSubmit(e)} className="flex items-center gap-2">
             <input
-              className="min-w-0 flex-1 rounded-full border border-zinc-600 bg-zinc-900/50 px-4 py-2.5 text-sm text-zinc-100 shadow-sm placeholder:text-zinc-500 transition-colors duration-150 focus:border-blue-500/45 focus:outline-none focus:ring-1 focus:ring-blue-500/25 disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/50 px-4 py-2.5 text-sm text-zinc-100 shadow-inner shadow-black/20 placeholder:text-zinc-500 transition duration-200 focus:border-blue-500/40 focus:outline-none focus:ring-1 focus:ring-blue-500/25 disabled:opacity-50"
               placeholder="Message…"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -206,7 +206,7 @@ export function ChatPanel() {
             <button
               type="submit"
               disabled={isSending || !draft.trim()}
-              className="flex shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-gradient-to-br from-blue-600 to-blue-800 p-2.5 text-white shadow-sm transition-opacity duration-150 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex shrink-0 items-center justify-center rounded-full border border-blue-500/35 bg-gradient-to-br from-blue-600 to-blue-900 p-2.5 text-white shadow-lg shadow-blue-950/35 transition duration-200 hover:opacity-95 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               aria-label="Send message"
             >
               {isSending ? (

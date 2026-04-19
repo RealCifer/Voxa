@@ -4,22 +4,23 @@ type PanelProps = {
   title: string;
   children: ReactNode;
   aside?: ReactNode;
-  /** Appended to the scrollable body (e.g. `overflow-hidden p-0` for custom inner scroll). */
+  /** Replaces default padded scroll body (e.g. `flex min-h-0 flex-col overflow-hidden p-0`). */
   bodyClassName?: string;
 };
 
 export function Panel({ title, children, aside, bodyClassName }: Readonly<PanelProps>) {
-  const body =
+  const bodyClasses =
     bodyClassName != null && bodyClassName.length > 0
-      ? `min-h-0 flex-1 text-sm text-zinc-100 transition-opacity duration-150 ${bodyClassName}`
-      : "min-h-0 flex-1 overflow-auto p-4 text-sm text-zinc-100 transition-opacity duration-150";
+      ? `min-h-0 flex-1 text-sm leading-relaxed text-zinc-100 transition-opacity duration-200 ${bodyClassName}`
+      : "voxa-scroll min-h-0 flex-1 overflow-auto p-4 text-sm leading-relaxed text-zinc-100 transition-opacity duration-200 md:p-6";
+
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-zinc-800 shadow-sm">
-      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-700 bg-zinc-800/90 px-4 py-3 backdrop-blur">
-        <h2 className="text-sm font-semibold text-zinc-100">{title}</h2>
+    <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 shadow-lg shadow-black/25 backdrop-blur-xl backdrop-saturate-150">
+      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800/90 bg-zinc-900/35 px-4 py-3 backdrop-blur-md md:px-6">
+        <h2 className="text-sm font-semibold tracking-tight text-zinc-100">{title}</h2>
         {aside ? <div className="shrink-0">{aside}</div> : null}
       </header>
-      <div className={[body, bodyClassName].filter(Boolean).join(" ")}>{children}</div>
+      <div className={bodyClasses}>{children}</div>
     </section>
   );
 }

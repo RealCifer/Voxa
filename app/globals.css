@@ -5,6 +5,43 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+}
+
+/* Premium app shell: zinc-950 → black */
+.voxa-app-bg {
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgb(39 39 42 / 0.35), transparent 55%),
+    linear-gradient(165deg, rgb(9 9 11) 0%, rgb(3 7 18) 42%, rgb(0 0 0) 100%);
+}
+
+/* Thin, low-contrast scrollbars (WebKit + Firefox) */
+.voxa-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(63 63 70 / 0.55) transparent;
+}
+
+.voxa-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.voxa-scroll::-webkit-scrollbar-thumb {
+  background: rgb(63 63 70 / 0.55);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.voxa-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 @keyframes voxa-fade-in {
   from {
     opacity: 0;
@@ -17,7 +54,7 @@
 }
 
 .voxa-fade-in {
-  animation: voxa-fade-in 180ms ease-out both;
+  animation: voxa-fade-in 200ms ease-out both;
 }
 
 @keyframes chat-typing-dot {
@@ -44,4 +81,3 @@
 .chat-typing-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
-

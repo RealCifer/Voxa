@@ -31,13 +31,13 @@ function formatBatchTime(iso: string): string {
 function SuggestionSkeleton() {
   return (
     <div
-      className="animate-pulse rounded-xl border border-zinc-700/80 bg-zinc-800 p-4 shadow-sm"
+      className="animate-pulse rounded-xl border border-zinc-800 bg-zinc-900/45 p-4 shadow-md shadow-black/20 backdrop-blur-sm"
       aria-hidden="true"
     >
-      <div className="mb-3 h-5 w-20 rounded-md bg-zinc-700/80" />
+      <div className="mb-3 h-5 w-20 rounded-lg bg-zinc-800/90" />
       <div className="space-y-2">
-        <div className="h-4 w-full rounded bg-zinc-700/60" />
-        <div className="h-4 max-w-[88%] rounded bg-zinc-700/50" />
+        <div className="h-4 w-full rounded-lg bg-zinc-800/70" />
+        <div className="h-4 max-w-[88%] rounded-lg bg-zinc-800/55" />
       </div>
     </div>
   );
@@ -200,7 +200,7 @@ export function SuggestionsPanel() {
         <button
           type="button"
           onClick={() => void refreshOnce()}
-          className="rounded-xl border border-zinc-600 bg-zinc-900/50 px-3 py-1.5 text-xs font-medium text-zinc-200 shadow-sm transition hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-2xl border border-zinc-800 bg-zinc-900/45 px-3 py-2 text-xs font-semibold text-zinc-100 shadow-sm backdrop-blur-sm transition duration-200 hover:border-zinc-700 hover:bg-zinc-900/70 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={isRefreshing}
         >
           {isRefreshing ? "Refreshing…" : "Refresh"}
@@ -210,14 +210,14 @@ export function SuggestionsPanel() {
       <div className="space-y-5">
         {refreshError ? (
           <div
-            className="flex items-start justify-between gap-2 rounded-xl border border-red-900/50 bg-red-950/35 px-3 py-2"
+            className="flex items-start justify-between gap-2 rounded-2xl border border-red-900/50 bg-red-950/35 px-3 py-2.5 shadow-sm backdrop-blur-sm"
             role="alert"
           >
             <p className="min-w-0 flex-1 text-xs text-red-100">{refreshError}</p>
             <button
               type="button"
               onClick={() => setRefreshError(null)}
-              className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-900/40"
+              className="shrink-0 rounded-xl px-2 py-0.5 text-[11px] font-medium text-red-200 transition-opacity duration-150 hover:bg-red-900/40"
             >
               Dismiss
             </button>
@@ -225,14 +225,14 @@ export function SuggestionsPanel() {
         ) : null}
         {suggestionChatError ? (
           <div
-            className="flex items-start justify-between gap-2 rounded-xl border border-red-900/50 bg-red-950/35 px-3 py-2"
+            className="flex items-start justify-between gap-2 rounded-2xl border border-red-900/50 bg-red-950/35 px-3 py-2.5 shadow-sm backdrop-blur-sm"
             role="alert"
           >
             <p className="min-w-0 flex-1 text-xs text-red-100">{suggestionChatError}</p>
             <button
               type="button"
               onClick={() => setSuggestionChatError(null)}
-              className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-900/40"
+              className="shrink-0 rounded-xl px-2 py-0.5 text-[11px] font-medium text-red-200 transition-opacity duration-150 hover:bg-red-900/40"
             >
               Dismiss
             </button>
@@ -241,7 +241,7 @@ export function SuggestionsPanel() {
 
         {isRefreshing ? (
           <div className="space-y-3" aria-busy="true" aria-label="Loading suggestions">
-            <p className="text-xs font-medium text-zinc-400">Updating suggestions…</p>
+            <p className="text-xs font-semibold text-zinc-400">Updating suggestions…</p>
             <SuggestionSkeleton />
             <SuggestionSkeleton />
             <SuggestionSkeleton />
@@ -253,8 +253,8 @@ export function SuggestionsPanel() {
             key={b.id}
             className={`space-y-3 ${fadeInBatchIds.includes(b.id) ? "voxa-fade-in" : ""}`}
           >
-            <div className="flex items-center justify-between gap-2 border-b border-zinc-700/60 pb-2">
-              <span className="text-xs font-medium text-zinc-300">Batch</span>
+            <div className="flex items-center justify-between gap-2 border-b border-zinc-800/90 pb-2">
+              <span className="text-xs font-semibold text-zinc-300">Batch</span>
               <time className="text-[11px] tabular-nums text-zinc-400" dateTime={b.createdAt}>
                 {formatBatchTime(b.createdAt)}
               </time>
@@ -267,7 +267,7 @@ export function SuggestionsPanel() {
                   title="Open in chat with transcript context"
                   disabled={expandingId !== null}
                   onClick={() => void onSuggestionActivate(s)}
-                  className="group w-full cursor-pointer rounded-xl border border-zinc-700 bg-zinc-800 p-4 text-left shadow-sm transition duration-150 ease-out hover:scale-[1.02] hover:border-zinc-500 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+                  className="group w-full cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/45 p-4 text-left shadow-md shadow-black/15 backdrop-blur-sm transition duration-200 ease-out hover:scale-105 hover:border-zinc-600 hover:shadow-[0_0_28px_-6px_rgba(59,130,246,0.22)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500/50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-md"
                 >
                   <div className="flex flex-col gap-3">
                     <span
@@ -275,7 +275,7 @@ export function SuggestionsPanel() {
                     >
                       {s.kind}
                     </span>
-                    <p className="min-w-0 text-sm font-medium leading-relaxed text-zinc-100">
+                    <p className="min-w-0 text-sm font-semibold leading-relaxed text-zinc-100">
                       {expandingId === s.id ? "Opening in chat…" : s.preview}
                     </p>
                   </div>

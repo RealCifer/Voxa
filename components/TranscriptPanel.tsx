@@ -8,6 +8,20 @@ import { getGroqApiKey } from "@/lib/groqClient";
 
 const CHUNK_TIMESLICE_MS = 30_000; // <= 30s per requirement
 
+function MicGlyph({ className }: Readonly<{ className?: string }>) {
+  return (
+    <svg className={className} width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path d="M8 11v1a4 4 0 008 0v-1M12 19v2M9 21h6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   const mm = Math.floor(s / 60);
@@ -164,50 +178,50 @@ export function TranscriptPanel() {
   }, [transcript.length]);
 
   return (
-    <Panel
-      title="Transcript"
-    >
-      <div className="flex h-full min-h-[12rem] flex-col gap-4">
-        <div className="flex items-center justify-center">
+    <Panel title="Transcript" bodyClassName="flex min-h-0 flex-col overflow-hidden p-0">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center gap-3">
           <button
             type="button"
             onClick={isMicActive ? stopRecording : startRecording}
-            className={`group relative flex w-full max-w-md items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold shadow-sm transition ${
+            className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold shadow-lg transition duration-200 ease-out active:scale-95 ${
               isMicActive
-                ? "border-red-700/60 bg-red-950/40 text-red-100"
-                : "border-zinc-700 bg-zinc-900/40 text-zinc-100 hover:bg-zinc-900/60"
+                ? "border-red-500/50 bg-gradient-to-br from-red-600 to-red-950 text-white shadow-red-900/30 ring-4 ring-red-500/20 animate-pulse"
+                : "border-zinc-700 bg-zinc-900/55 text-zinc-200 shadow-black/30 backdrop-blur-sm hover:border-zinc-600 hover:bg-zinc-900/80"
             }`}
             aria-label={isMicActive ? "Stop microphone" : "Start microphone"}
           >
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                isMicActive ? "bg-red-400 shadow-[0_0_0_4px_rgba(248,113,113,0.12)]" : "bg-zinc-400"
-              } ${isMicActive ? "animate-pulse" : ""}`}
-              aria-hidden="true"
-            />
-            <span>{isMicActive ? "Recording" : "Start recording"}</span>
+            {isMicActive ? (
+              <span className="h-3 w-3 rounded-full bg-white shadow-[0_0_0_6px_rgba(254,202,202,0.25)]" />
+            ) : (
+              <MicGlyph className="text-zinc-200" />
+            )}
           </button>
+          <p className="text-center text-xs text-zinc-400">
+            {isMicActive ? "Tap to stop" : "Tap to record"}
+          </p>
         </div>
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-700 bg-zinc-900/30 px-4 py-3 text-xs text-zinc-400">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-xs text-zinc-400 shadow-sm backdrop-blur-sm">
           <span>
             {isMicActive ? (
-              <span className="text-zinc-100">
+              <span className="font-medium text-zinc-100">
                 Listening<span className="animate-pulse">…</span>
               </span>
             ) : (
               <span>Mic idle</span>
             )}
           </span>
-          <span className="truncate">
-            Chunks: <span className="text-zinc-100">{audioChunks.length}</span> · Status:{" "}
+          <span className="truncate tabular-nums">
+            Chunks <span className="text-zinc-100">{audioChunks.length}</span>
+            <span className="text-zinc-600"> · </span>
             <span className="text-zinc-100">{statusLabel}</span>
           </span>
         </div>
 
         {error ? (
           <div
-            className="rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-sm text-red-100"
+            className="rounded-2xl border border-red-900/55 bg-red-950/35 p-3 text-sm text-red-100 shadow-sm backdrop-blur-sm"
             role="alert"
           >
             {error}
@@ -216,29 +230,35 @@ export function TranscriptPanel() {
 
         <div
           ref={scrollerRef}
-          className="min-h-0 flex-1 overflow-y-auto pr-1"
+          className="voxa-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
         >
           {transcript.length === 0 ? (
-            <div className="rounded-xl border border-zinc-700 bg-zinc-900/30 p-4 text-sm text-zinc-400">
-              Start recording to capture audio. Transcript entries will appear here as they’re transcribed.
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/35 p-4 text-sm text-zinc-400 shadow-sm backdrop-blur-sm">
+              Start recording. Transcript lines appear here with smooth scroll and fade-in.
             </div>
           ) : (
-            <ul className="space-y-2">
-              {transcript.map((seg) => (
+            <ul className="space-y-3">
+              {transcript.map((seg, i) => (
                 <li key={seg.id} className="voxa-fade-in">
-                  <div className="max-w-[92%] rounded-xl border border-zinc-700 bg-zinc-900/35 p-3 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[11px] text-zinc-400">
-                        {formatMs(seg.startMs)}
-                        {seg.isFinal ? " · final" : ""}
-                      </span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-100">{seg.text}</p>
+                  <div
+                    className={`max-w-[92%] rounded-xl border p-3 shadow-sm backdrop-blur-sm transition-opacity duration-200 ${
+                      i % 2 === 0
+                        ? "border-zinc-800 bg-zinc-900/45"
+                        : "border-zinc-800/80 bg-zinc-950/35"
+                    }`}
+                  >
+                    <span className="text-[11px] tabular-nums text-zinc-400">
+                      {formatMs(seg.startMs)}
+                      {seg.isFinal ? " · final" : ""}
+                    </span>
+                    <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-100">
+                      {seg.text}
+                    </p>
                   </div>
                 </li>
               ))}
               <li aria-hidden="true">
-                <div ref={bottomRef} />
+                <div ref={bottomRef} className="h-px" />
               </li>
             </ul>
           )}

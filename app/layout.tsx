@@ -25,10 +25,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full font-sans antialiased dark`}
     >
       <body
-        className="flex min-h-dvh flex-col bg-slate-950 text-zinc-100"
+        className="voxa-app-bg flex min-h-dvh min-h-0 flex-col text-zinc-100"
         suppressHydrationWarning
       >
         {children}
