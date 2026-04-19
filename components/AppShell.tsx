@@ -9,8 +9,8 @@ export function AppShell() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <AppHeader />
-      <main className="min-h-0 flex-1 px-4 py-4 md:px-6 md:py-6">
-        <div className="grid min-h-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <main className="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-6">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-h-0">
           <TranscriptPanel />
           <SuggestionsPanel />
           <ChatPanel />

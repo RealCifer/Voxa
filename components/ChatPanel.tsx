@@ -1,12 +1,69 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
 import { requestChatCompletion } from "@/lib/chatClient";
 import { loadVoxaConfig } from "@/lib/config";
 import { getGroqApiKey } from "@/lib/groqClient";
 import { useAppStore } from "@/lib/store/app-store";
 import { formatTranscriptForLlm } from "@/lib/transcriptFormat";
+import type { ChatMessage } from "@/types";
+
+function SendIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2 .01 7z" />
+    </svg>
+  );
+}
+
+function AssistantLoadingBubble() {
+  return (
+    <div
+      className="voxa-fade-in mr-auto max-w-[88%] rounded-2xl border border-zinc-700 bg-zinc-900/45 px-4 py-3 shadow-sm"
+      aria-live="polite"
+      aria-label="Assistant is replying"
+    >
+      <div className="mb-3 flex animate-pulse gap-2">
+        <div className="h-2.5 w-14 rounded-full bg-zinc-700/80" />
+        <div className="h-2.5 w-24 rounded-full bg-zinc-700/55" />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="chat-typing-dot inline-block h-2 w-2 rounded-full bg-zinc-400" />
+        <span className="chat-typing-dot inline-block h-2 w-2 rounded-full bg-zinc-400" />
+        <span className="chat-typing-dot inline-block h-2 w-2 rounded-full bg-zinc-400" />
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ m }: Readonly<{ m: ChatMessage }>) {
+  if (m.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="voxa-fade-in max-w-[88%] rounded-2xl border border-blue-500/25 bg-gradient-to-br from-blue-600 to-blue-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-opacity duration-150">
+          <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+        </div>
+      </div>
+    );
+  }
+  if (m.role === "assistant") {
+    return (
+      <div className="flex justify-start">
+        <div className="voxa-fade-in max-w-[88%] rounded-2xl border border-zinc-700 bg-zinc-900/45 px-4 py-2.5 text-sm text-zinc-100 shadow-sm transition-opacity duration-150">
+          <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-center px-1">
+      <div className="max-w-[92%] rounded-xl border border-zinc-700/80 bg-zinc-900/35 px-3 py-2 text-center text-xs leading-relaxed text-zinc-400 transition-opacity duration-150">
+        {m.content}
+      </div>
+    </div>
+  );
+}
 
 export function ChatPanel() {
   const chat = useAppStore((s) => s.chat);
@@ -16,6 +73,7 @@ export function ChatPanel() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const inFlightRef = useRef(false);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const config = useMemo(() => loadVoxaConfig(), []);
   const transcriptForChat = useMemo(
@@ -27,6 +85,12 @@ export function ChatPanel() {
       ),
     [config.chatContextWindow, config.chatTranscriptMaxChars, transcript],
   );
+
+  const lastMessageId = chat.length > 0 ? chat.at(-1)?.id : undefined;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chat.length, lastMessageId, isSending]);
 
   async function onSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -92,75 +156,67 @@ export function ChatPanel() {
   }
 
   return (
-    <Panel title="Chat">
-      <div className="flex h-full min-h-[12rem] flex-col gap-3">
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {chat.length === 0 ? (
-            <p className="text-neutral-500 dark:text-neutral-500">
-              Messages with the assistant will show here. Type below or click a suggestion to start.
-            </p>
-          ) : (
-            chat.map((m) => (
-              <div
-                key={m.id}
-                className={`rounded border px-2 py-1.5 text-sm ${
-                  m.role === "user"
-                    ? "border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900"
-                    : "border-neutral-200 dark:border-neutral-800"
-                }`}
-              >
-                <span className="text-xs uppercase text-neutral-400">{m.role}</span>
-                <p className="mt-0.5 whitespace-pre-wrap">{m.content}</p>
-              </div>
-            ))
-          )}
-          {isSending ? (
-            <div
-              className="rounded border border-dashed border-neutral-300 px-2 py-2 text-sm text-neutral-500 dark:border-neutral-600 dark:text-neutral-400"
-              aria-live="polite"
-            >
-              <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
-                Assistant
-              </span>
-              <p className="mt-1 animate-pulse">Replying…</p>
+    <Panel title="Chat" bodyClassName="flex min-h-0 flex-col overflow-hidden p-0">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2 pt-4">
+          {chat.length === 0 && !isSending ? (
+            <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2 px-2 text-center">
+              <p className="text-sm text-zinc-400">Messages appear here.</p>
+              <p className="max-w-xs text-xs text-zinc-500">
+                Type below or open a suggestion to continue the thread.
+              </p>
             </div>
-          ) : null}
+          ) : (
+            <div className="space-y-3">
+              {chat.map((m) => (
+                <MessageBubble key={m.id} m={m} />
+              ))}
+              {isSending ? <AssistantLoadingBubble /> : null}
+              <div ref={bottomRef} className="h-px w-full shrink-0" aria-hidden="true" />
+            </div>
+          )}
         </div>
+
         {sendError ? (
           <div
-            className="flex shrink-0 items-start justify-between gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/50 dark:bg-red-950/40"
+            className="flex shrink-0 items-start justify-between gap-2 border-t border-zinc-700/80 bg-zinc-900/30 px-4 py-2"
             role="alert"
           >
-            <p className="min-w-0 flex-1 text-xs text-red-800 dark:text-red-200">{sendError}</p>
+            <p className="min-w-0 flex-1 text-xs text-red-200">{sendError}</p>
             <button
               type="button"
               onClick={() => setSendError(null)}
-              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-red-800 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/50"
+              className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] text-red-200 transition-opacity duration-150 hover:bg-red-950/50"
             >
               Dismiss
             </button>
           </div>
         ) : null}
-        <form
-          onSubmit={(e) => void onSubmit(e)}
-          className="flex shrink-0 gap-2 border-t border-neutral-200 pt-2 dark:border-neutral-800"
-        >
-          <input
-            className="min-w-0 flex-1 rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-950"
-            placeholder="Type a message…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={isSending}
-            aria-label="Chat message"
-          />
-          <button
-            type="submit"
-            disabled={isSending}
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700"
-          >
-            {isSending ? "Sending…" : "Send"}
-          </button>
-        </form>
+
+        <div className="sticky bottom-0 z-10 shrink-0 border-t border-zinc-700/80 bg-zinc-800/95 px-3 pb-3 pt-3 backdrop-blur-sm">
+          <form onSubmit={(e) => void onSubmit(e)} className="flex items-center gap-2">
+            <input
+              className="min-w-0 flex-1 rounded-full border border-zinc-600 bg-zinc-900/50 px-4 py-2.5 text-sm text-zinc-100 shadow-sm placeholder:text-zinc-500 transition-colors duration-150 focus:border-blue-500/45 focus:outline-none focus:ring-1 focus:ring-blue-500/25 disabled:opacity-50"
+              placeholder="Message…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={isSending}
+              aria-label="Chat message"
+            />
+            <button
+              type="submit"
+              disabled={isSending || !draft.trim()}
+              className="flex shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-gradient-to-br from-blue-600 to-blue-800 p-2.5 text-white shadow-sm transition-opacity duration-150 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Send message"
+            >
+              {isSending ? (
+                <span className="h-[18px] w-[18px] animate-pulse rounded-full bg-white/40" aria-hidden />
+              ) : (
+                <SendIcon />
+              )}
+            </button>
+          </form>
+        </div>
       </div>
     </Panel>
   );
