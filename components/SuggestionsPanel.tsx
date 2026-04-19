@@ -12,6 +12,37 @@ import type { Suggestion } from "@/types";
 
 const AUTO_REFRESH_MS = 30_000;
 
+function badgeClass(kind: Suggestion["kind"]): string {
+  if (kind === "question") {
+    return "border-blue-500/40 bg-blue-950/50 text-blue-200";
+  }
+  if (kind === "insight") {
+    return "border-violet-500/40 bg-violet-950/50 text-violet-200";
+  }
+  return "border-amber-500/40 bg-amber-950/50 text-amber-200";
+}
+
+function formatBatchTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(11, 19);
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function SuggestionSkeleton() {
+  return (
+    <div
+      className="animate-pulse rounded-xl border border-zinc-700/80 bg-zinc-800 p-4 shadow-sm"
+      aria-hidden="true"
+    >
+      <div className="mb-3 h-5 w-20 rounded-md bg-zinc-700/80" />
+      <div className="space-y-2">
+        <div className="h-4 w-full rounded bg-zinc-700/60" />
+        <div className="h-4 max-w-[88%] rounded bg-zinc-700/50" />
+      </div>
+    </div>
+  );
+}
+
 export function SuggestionsPanel() {
   const batches = useAppStore((s) => s.suggestionBatches);
   const transcript = useAppStore((s) => s.transcript);
@@ -21,6 +52,8 @@ export function SuggestionsPanel() {
   const [expandingId, setExpandingId] = useState<string | null>(null);
   const [suggestionChatError, setSuggestionChatError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [fadeInBatchIds, setFadeInBatchIds] = useState<string[]>([]);
+  const seenBatchIdsRef = useRef<Set<string>>(new Set());
   const lastHashRef = useRef<string>("");
   const inFlightRefreshRef = useRef(false);
 
@@ -151,6 +184,15 @@ export function SuggestionsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript.length, lastSeg?.id]);
 
+  useEffect(() => {
+    const fresh = batches.filter((b) => !seenBatchIdsRef.current.has(b.id));
+    if (fresh.length === 0) return;
+    fresh.forEach((b) => seenBatchIdsRef.current.add(b.id));
+    setFadeInBatchIds(fresh.map((b) => b.id));
+    const t = globalThis.setTimeout(() => setFadeInBatchIds([]), 220);
+    return () => globalThis.clearTimeout(t);
+  }, [batches]);
+
   return (
     <Panel
       title="Suggestions"
@@ -158,24 +200,24 @@ export function SuggestionsPanel() {
         <button
           type="button"
           onClick={() => void refreshOnce()}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700"
+          className="rounded-xl border border-zinc-600 bg-zinc-900/50 px-3 py-1.5 text-xs font-medium text-zinc-200 shadow-sm transition hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={isRefreshing}
         >
           {isRefreshing ? "Refreshing…" : "Refresh"}
         </button>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {refreshError ? (
           <div
-            className="flex items-start justify-between gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/50 dark:bg-red-950/40"
+            className="flex items-start justify-between gap-2 rounded-xl border border-red-900/50 bg-red-950/35 px-3 py-2"
             role="alert"
           >
-            <p className="min-w-0 flex-1 text-xs text-red-800 dark:text-red-200">{refreshError}</p>
+            <p className="min-w-0 flex-1 text-xs text-red-100">{refreshError}</p>
             <button
               type="button"
               onClick={() => setRefreshError(null)}
-              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-red-800 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/50"
+              className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-900/40"
             >
               Dismiss
             </button>
@@ -183,43 +225,59 @@ export function SuggestionsPanel() {
         ) : null}
         {suggestionChatError ? (
           <div
-            className="flex items-start justify-between gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/50 dark:bg-red-950/40"
+            className="flex items-start justify-between gap-2 rounded-xl border border-red-900/50 bg-red-950/35 px-3 py-2"
             role="alert"
           >
-            <p className="min-w-0 flex-1 text-xs text-red-800 dark:text-red-200">
-              {suggestionChatError}
-            </p>
+            <p className="min-w-0 flex-1 text-xs text-red-100">{suggestionChatError}</p>
             <button
               type="button"
               onClick={() => setSuggestionChatError(null)}
-              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-red-800 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/50"
+              className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-900/40"
             >
               Dismiss
             </button>
           </div>
         ) : null}
+
+        {isRefreshing ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Loading suggestions">
+            <p className="text-xs font-medium text-zinc-400">Updating suggestions…</p>
+            <SuggestionSkeleton />
+            <SuggestionSkeleton />
+            <SuggestionSkeleton />
+          </div>
+        ) : null}
+
         {batches.map((b) => (
-          <section key={b.id} className="space-y-2">
-            <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              Batch · {b.createdAt.slice(11, 19)}Z
+          <section
+            key={b.id}
+            className={`space-y-3 ${fadeInBatchIds.includes(b.id) ? "voxa-fade-in" : ""}`}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-zinc-700/60 pb-2">
+              <span className="text-xs font-medium text-zinc-300">Batch</span>
+              <time className="text-[11px] tabular-nums text-zinc-400" dateTime={b.createdAt}>
+                {formatBatchTime(b.createdAt)}
+              </time>
             </div>
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 gap-3">
               {b.items.map((s) => (
                 <button
                   key={s.id}
                   type="button"
-                  title="Send to chat with transcript context (last N segments)"
+                  title="Open in chat with transcript context"
                   disabled={expandingId !== null}
                   onClick={() => void onSuggestionActivate(s)}
-                  className="w-full rounded border border-neutral-200 bg-white p-2.5 text-left transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900/80"
+                  className="group w-full cursor-pointer rounded-xl border border-zinc-700 bg-zinc-800 p-4 text-left shadow-sm transition duration-150 ease-out hover:scale-[1.02] hover:border-zinc-500 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="min-w-0 flex-1 text-sm text-neutral-800 dark:text-neutral-200">
-                      {expandingId === s.id ? "Opening in chat…" : s.preview}
-                    </p>
-                    <span className="shrink-0 rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                  <div className="flex flex-col gap-3">
+                    <span
+                      className={`w-fit rounded-lg border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${badgeClass(s.kind)}`}
+                    >
                       {s.kind}
                     </span>
+                    <p className="min-w-0 text-sm font-medium leading-relaxed text-zinc-100">
+                      {expandingId === s.id ? "Opening in chat…" : s.preview}
+                    </p>
                   </div>
                 </button>
               ))}
