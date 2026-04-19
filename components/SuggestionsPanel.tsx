@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel } from "@/components/panels/Panel";
-import { requestChatCompletion } from "@/lib/chatClient";
 import { loadVoxaConfig } from "@/lib/config";
+import { requestDetail } from "@/lib/detailClient";
 import { getGroqApiKey } from "@/lib/groqClient";
+import { requestSuggestions } from "@/lib/suggestionsClient";
 import { useAppStore } from "@/lib/store/app-store";
 import { formatTranscriptForLlm } from "@/lib/transcriptFormat";
 import type { Suggestion } from "@/types";
@@ -34,18 +35,21 @@ export function SuggestionsPanel() {
     [config.suggestionContextWindow, config.suggestionTranscriptMaxChars, transcript],
   );
 
-  /** Timed tail for `/api/suggest` smart window (`getSmartContext`); keeps payload bounded. */
+  /** Timed tail for suggestion smart window (`getSmartContext`); keeps payload bounded. */
   const segmentsForSuggest = useMemo(() => {
     const n = Math.min(
       transcript.length,
       Math.max(config.suggestionContextWindow, 150),
     );
-    return transcript.slice(-n).map((s) => ({
-      id: s.id,
-      text: s.text,
-      startMs: s.startMs,
-      ...(s.endMs !== undefined ? { endMs: s.endMs } : {}),
-    }));
+    return transcript.slice(-n).map((s) => {
+      const seg: { id: string; text: string; startMs: number; endMs?: number } = {
+        id: s.id,
+        text: s.text,
+        startMs: s.startMs,
+      };
+      if (typeof s.endMs === "number") seg.endMs = s.endMs;
+      return seg;
+    });
   }, [config.suggestionContextWindow, transcript]);
 
   async function refreshOnce() {
@@ -58,70 +62,19 @@ export function SuggestionsPanel() {
     setRefreshError(null);
     try {
       const apiKey = getGroqApiKey();
-      const res = await fetch("/api/suggest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(apiKey ? { "x-groq-api-key": apiKey } : {}),
-        },
-        body: JSON.stringify({
-          transcript: recentTranscript,
-          segments: segmentsForSuggest,
-          lineLimit: Math.min(80, Math.max(24, config.suggestionContextWindow * 2)),
-          smartSeconds: config.suggestionSmartSeconds,
-          prompt: config.suggestionPrompt,
-          maxTranscriptChars: config.suggestionTranscriptMaxChars,
-        }),
+      const result = await requestSuggestions({
+        apiKey,
+        segments: segmentsForSuggest,
+        lineLimit: Math.min(80, Math.max(24, config.suggestionContextWindow * 2)),
+        smartSeconds: config.suggestionSmartSeconds,
+        maxTranscriptChars: config.suggestionTranscriptMaxChars,
       });
-
-      const raw = await res.text();
-      let json: { suggestions?: unknown; error?: string } = {};
-      try {
-        json = JSON.parse(raw) as { suggestions?: unknown; error?: string };
-      } catch {
-        json = {};
-      }
-
-      if (!res.ok) {
-        setRefreshError(
-          typeof json.error === "string"
-            ? json.error
-            : `Suggestions failed (${res.status}). Check your API key and try Refresh.`,
-        );
+      if ("error" in result) {
+        setRefreshError(result.error);
         return;
       }
 
-      const suggestions = Array.isArray(json.suggestions) ? json.suggestions : [];
-      if (suggestions.length === 0) return;
-      if (suggestions.length !== 3) {
-        setRefreshError("Suggestions response was invalid. Try Refresh again.");
-        return;
-      }
-
-      const items = suggestions
-        .map((s) => {
-          const row = s as { kind?: string; type?: string; preview?: string; text?: string };
-          const kindRaw = row.kind ?? row.type ?? "clarification";
-          const kind =
-            kindRaw === "question" || kindRaw === "insight" || kindRaw === "clarification"
-              ? kindRaw
-              : "clarification";
-          const preview = (row.preview ?? row.text ?? "").trim();
-          return {
-            id: crypto.randomUUID(),
-            kind,
-            preview,
-            source: "llm" as const,
-          };
-        })
-        .filter((x) => x.preview.length > 0);
-
-      if (items.length !== 3) {
-        setRefreshError("Suggestions response was invalid. Try Refresh again.");
-        return;
-      }
-
-      prependBatch(items as never);
+      prependBatch(result.suggestions);
     } catch (e) {
       console.error("[suggestions error]", e);
       setRefreshError(
@@ -163,22 +116,10 @@ export function SuggestionsPanel() {
     });
 
     try {
-      const history = useAppStore.getState().chat;
-      const messages = history
-        .filter((m): m is { role: "user" | "assistant"; content: string; id: string; createdAt: string } =>
-          m.role === "user" || m.role === "assistant",
-        )
-        .map((m) => ({ role: m.role, content: m.content }));
-
-      const result = await requestChatCompletion({
+      const result = await requestDetail({
         apiKey,
         transcript: transcriptForDetail,
-        messages,
-        chatPrompt: config.chatPrompt,
-        detailPrompt: config.detailPrompt,
-        suggestion: { kind: s.kind, preview: s.preview },
-        chatHistoryLimit: config.chatMaxMessages,
-        transcriptMaxChars: config.chatTranscriptMaxChars,
+        selectedSuggestion: { kind: s.kind, preview: s.preview },
       });
 
       if ("error" in result) {
@@ -189,7 +130,7 @@ export function SuggestionsPanel() {
       pushChat({
         id: crypto.randomUUID(),
         role: "assistant",
-        content: result.content,
+        content: result.answer,
         createdAt: new Date().toISOString(),
       });
     } finally {

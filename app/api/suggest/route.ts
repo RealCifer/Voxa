@@ -84,10 +84,6 @@ export async function POST(req: Request) {
       smartSeconds?: unknown;
     };
 
-  if (typeof transcript !== "string") {
-    return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
-  }
-
   const cap = clampInt(
     maxTranscriptChars,
     400,
@@ -98,7 +94,16 @@ export async function POST(req: Request) {
   const smartS = clampInt(smartSeconds, 15, 600, 90);
   const segParsed = parseSuggestionSegments(segments);
 
-  const transcriptTrimmed = optimizeTranscriptForSuggestions(transcript, segParsed, {
+  const transcriptStr =
+    typeof transcript === "string" && transcript.trim().length > 0 ? transcript : undefined;
+  if (!transcriptStr && (!segParsed || segParsed.length === 0)) {
+    return NextResponse.json(
+      { error: "Missing transcript (string) or segments (array)" },
+      { status: 400 },
+    );
+  }
+
+  const transcriptTrimmed = optimizeTranscriptForSuggestions(transcriptStr, segParsed, {
     charCap: cap,
     lineLimit: lineLimitClamped,
     smartSeconds: smartS,

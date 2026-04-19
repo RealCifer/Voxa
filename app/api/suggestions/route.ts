@@ -65,10 +65,6 @@ export async function POST(req: Request) {
     maxTranscriptChars?: unknown;
   };
 
-  if (typeof b.transcript !== "string") {
-    return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
-  }
-
   const fromBody = typeof b.apiKey === "string" ? b.apiKey.trim() : "";
   const apiKey = fromBody || groqApiKeyFromRequest(req, null);
   if (!apiKey) {
@@ -83,7 +79,16 @@ export async function POST(req: Request) {
   const smartS = clampInt(b.smartSeconds, 15, 600, 90);
   const segParsed = parseSuggestionSegments(b.segments);
 
-  const snippet = optimizeTranscriptForSuggestions(b.transcript, segParsed, {
+  const transcript =
+    typeof b.transcript === "string" && b.transcript.trim().length > 0 ? b.transcript : undefined;
+  if (!transcript && (!segParsed || segParsed.length === 0)) {
+    return NextResponse.json(
+      { error: "Missing transcript (string) or segments (array)" },
+      { status: 400 },
+    );
+  }
+
+  const snippet = optimizeTranscriptForSuggestions(transcript, segParsed, {
     charCap: cap,
     lineLimit: lineLimitClamped,
     smartSeconds: smartS,

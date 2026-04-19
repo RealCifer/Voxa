@@ -77,10 +77,10 @@ export type OptimizeSuggestionContextOpts = {
 
 /**
  * Builds a compact transcript for suggestion models: smart time window when `segments` exist,
- * else recent deduped lines; then compression + tail char cap (never full blind send).
+ * else recent deduped lines from `transcript`; then compression + tail char cap (never full blind send).
  */
 export function optimizeTranscriptForSuggestions(
-  transcript: string,
+  transcript: string | undefined,
   segments: TranscriptSegment[] | undefined,
   opts: OptimizeSuggestionContextOpts,
 ): string {
@@ -92,7 +92,8 @@ export function optimizeTranscriptForSuggestions(
   if (segments && segments.length > 0) {
     core = dedupeConsecutiveLines(getSmartContext(segments, smartSeconds));
   } else {
-    const deduped = dedupeConsecutiveLines(transcript.trim());
+    const source = typeof transcript === "string" ? transcript : "";
+    const deduped = dedupeConsecutiveLines(source.trim());
     const lines = deduped
       .split("\n")
       .map((l) => l.trim())
