@@ -4,6 +4,12 @@ Voxa is a real-time meeting copilot web application that listens to live audio, 
 
 ---
 
+## Deployed Link
+
+voxa-chi-gules.vercel.app
+
+---
+
 ## Overview
 
 Voxa continuously processes live audio input and transforms it into actionable intelligence through a structured pipeline:
